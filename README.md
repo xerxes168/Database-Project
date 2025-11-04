@@ -12,4 +12,4 @@ pip install -r requirements.txt
 
 ### **Running the web application**
 
-```streamlit run main.py```
+```python app.py```
