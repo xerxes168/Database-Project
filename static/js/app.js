@@ -4,6 +4,33 @@ const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
 let trendChart = null;
+let hdbMap = null;
+
+function initMapbox() {
+  const mapEl = document.getElementById("map");
+  if (!mapEl || typeof mapboxgl === "undefined") {
+    console.warn("Map element or Mapbox GL not available");
+    return;
+  }
+
+  mapboxgl.accessToken = "pk.eyJ1IjoieGVyeGVzMTY4IiwiYSI6ImNtaGxxcDUyMjBuZnQybXNpejlrOW42ODEifQ.spgJB7Tvse-NB1QDFnWDRw";
+
+  hdbMap = new mapboxgl.Map({
+    container: mapEl,
+    style: "mapbox://styles/mapbox/light-v11", // or "mapbox://styles/mapbox/streets-v12"
+    center: [103.8198, 1.3521], // Singapore
+    zoom: 10.5,
+  });
+
+  // Controls
+  hdbMap.addControl(new mapboxgl.NavigationControl(), "top-right");
+  hdbMap.addControl(new mapboxgl.FullscreenControl(), "top-right");
+
+  // Make sure it renders correctly once everything is laid out
+  hdbMap.on("load", () => {
+    hdbMap.resize();
+  });
+}
 
 // ========== API HELPERS ==========
 async function getJSON(url) {
@@ -377,83 +404,6 @@ async function setupAffordabilityPanel() {
       showError(afResult, err.message);
     }
   });
-  
-  // Save scenario
-  $("#btn-save-scenario").addEventListener("click", async () => {
-    const name = $("#sc-name").value.trim();
-    if (!name) {
-      alert("Please enter a scenario name");
-      return;
-    }
-    
-    try {
-      const item = {
-        name: name,
-        income: parseFloat($("#af-income").value) || 0,
-        expenses: parseFloat($("#af-expenses").value) || 0,
-        interest: parseFloat($("#af-interest").value) || 2.6,
-        tenure_years: parseInt($("#af-tenure").value) || 25,
-      };
-      
-      const res = await postJSON("/api/scenarios", item);
-      if (res.ok) {
-        $("#sc-name").value = "";
-        await refreshScenarios();
-        alert("Scenario saved to MongoDB!");
-      }
-    } catch (err) {
-      alert("Error saving scenario: " + err.message);
-    }
-  });
-  
-  $("#btn-refresh-scenarios").addEventListener("click", refreshScenarios);
-  await refreshScenarios();
-}
-
-async function refreshScenarios() {
-  const list = $("#sc-list");
-  
-  try {
-    const res = await getJSON("/api/scenarios");
-    
-    if (!res.ok || !res.items || res.items.length === 0) {
-      list.innerHTML = `<p class="text-sm text-zinc-400 text-center py-4">No saved scenarios yet</p>`;
-      return;
-    }
-    
-    list.innerHTML = res.items.map(it => `
-      <div class="flex items-center justify-between p-3 bg-zinc-800 rounded-lg border border-zinc-700 hover:border-emerald-500/50 transition">
-        <div class="flex-1">
-          <div class="font-medium text-sm text-zinc-200">${it.name}</div>
-          <div class="text-xs text-zinc-400 mt-1">
-            Income: $${it.income.toLocaleString()} • 
-            Expenses: $${it.expenses.toLocaleString()} • 
-            ${it.interest}% • 
-            ${it.tenure_years}y
-          </div>
-        </div>
-        <button class="ml-3 px-3 py-1.5 text-xs bg-red-600 hover:bg-red-500 rounded transition" data-del="${it._id}">
-          Delete
-        </button>
-      </div>
-    `).join("");
-    
-    list.querySelectorAll("[data-del]").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        const id = btn.getAttribute("data-del");
-        if (confirm("Delete this scenario?")) {
-          try {
-            await deleteJSON(`/api/scenarios?id=${encodeURIComponent(id)}`);
-            await refreshScenarios();
-          } catch (err) {
-            alert("Error deleting: " + err.message);
-          }
-        }
-      });
-    });
-  } catch (err) {
-    showError(list, err.message);
-  }
 }
 
 // ========== PANEL 4: TOWN COMPARISON ==========
@@ -620,7 +570,7 @@ async function setupAmenitiesPanel() {
 // ========== BOOTSTRAP ==========
 async function bootstrap() {
   console.log("🚀 Initializing HDB HomeFinder DB...");
-  
+  initMapbox();
   // Setup tab system
   useTabs();
   

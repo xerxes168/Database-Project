@@ -3,14 +3,26 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Google Fonts: Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
   <title>HDB HomeFinder DB | {% block title %}Dashboard{% endblock %}</title>
-  
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  
+
   <!-- Chart.js for visualizations -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  
+
+  <!-- Mapbox GL -->
+  <link
+    href="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css"
+    rel="stylesheet"
+  />
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js"></script>
+
   <!-- Custom Tailwind Config -->
   <script>
     tailwind.config = {
@@ -28,36 +40,52 @@
       }
     }
   </script>
-  
+
   <style>
+    /* Global font */
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    /* Nicer dropdown styling */
+    select {
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
+      padding-right: 2.5rem;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%2394a3b8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M8.25 9.75L12 13.5l3.75-3.75'/%3E%3C/svg%3E");
+      background-position: right 0.75rem center;
+      background-repeat: no-repeat;
+      background-size: 0.75rem 0.75rem;
+    }
+
     .ui-tab.active {
       background: linear-gradient(135deg, #059669 0%, #10b981 100%);
       box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.3);
     }
-    
+
     .gradient-bg {
       background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
     }
-    
+
     .card-hover {
       transition: all 0.3s ease;
     }
-    
+
     .card-hover:hover {
       transform: translateY(-2px);
       box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.2);
     }
-    
+
     .animate-fade-in {
       animation: fadeIn 0.5s ease-in;
     }
-    
+
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(10px); }
       to { opacity: 1; transform: translateY(0); }
     }
-    
-    /* Loading spinner */
+
     .spinner {
       border: 3px solid rgba(16, 185, 129, 0.1);
       border-top-color: #10b981;
@@ -66,118 +94,383 @@
       height: 24px;
       animation: spin 0.8s linear infinite;
     }
-    
+
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
-    
-    /* Custom scrollbar */
+
     ::-webkit-scrollbar {
       width: 8px;
       height: 8px;
     }
-    
+
     ::-webkit-scrollbar-track {
       background: #18181b;
     }
-    
+
     ::-webkit-scrollbar-thumb {
       background: #3f3f46;
       border-radius: 4px;
     }
-    
+
     ::-webkit-scrollbar-thumb:hover {
       background: #52525b;
     }
   </style>
-  
+
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
+
 <body class="bg-zinc-950 text-zinc-100 min-h-screen antialiased">
-  <!-- Navigation Bar -->
-  <nav class="gradient-bg border-b border-zinc-800 sticky top-0 z-50 backdrop-blur-sm bg-opacity-90">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex items-center justify-between h-16">
+  <div class="flex min-h-screen">
+    <aside class="w-full max-w-xl bg-white text-slate-900 border-r border-zinc-200 flex flex-col shadow-xl">
+      <!-- Header: HDB HomeFinder title on top left -->
+      <nav class="px-6 py-4 border-b border-zinc-200 flex items-center justify-between">
         <div class="flex items-center space-x-3">
-          <div class="w-10 h-10 bg-gradient-to-br from-emerald-500 to-emerald-700 rounded-lg flex items-center justify-center">
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
-            </svg>
+          <div class="relative flex items-center justify-center">
+            <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 via-emerald-600 to-emerald-700 shadow-md flex items-center justify-center ring-2 ring-emerald-100">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l9-9 9 9" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10v9a1 1 0 001 1h4v-4a1 1 0 011-1h2a1 1 0 011 1v4h4a1 1 0 001-1v-9" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v3" />
+              </svg>
+            </div>
+            <span class="absolute -bottom-1 -right-1 text-[9px] px-1.5 py-0.5 rounded-full bg-white text-emerald-600 font-semibold tracking-tight shadow-sm">
+              DB
+            </span>
           </div>
           <div>
-            <h1 class="text-xl font-bold bg-gradient-to-r from-emerald-400 to-emerald-600 bg-clip-text text-transparent">
-              HDB HomeFinder DB
+            <h1 class="text-[1.15rem] font-semibold tracking-tight">
+              HDB HomeFinder
             </h1>
-            <p class="text-xs text-zinc-400">Singapore Public Housing Analytics</p>
+            <p class="text-[11px] text-zinc-400">
+              Find affordable resale homes across Singapore
+            </p>
           </div>
         </div>
-        
-        <div class="hidden md:flex items-center space-x-4">
-          <div class="flex items-center space-x-2 text-xs text-zinc-400">
-            <span class="flex items-center space-x-1">
-              <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-              <span>MySQL</span>
-            </span>
-            <span class="text-zinc-600">•</span>
-            <span class="flex items-center space-x-1">
-              <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-              <span>MongoDB</span>
-            </span>
+      </nav>
+
+      <div class="flex flex-1 overflow-hidden">
+        <!-- Icon rail like the logistics UI -->
+        <div class="w-14 bg-slate-50 border-r border-zinc-200 flex flex-col items-center justify-between py-4">
+          <div class="space-y-4">
+            <!-- Primary home icon -->
+            <button class="w-10 h-10 rounded-full bg-slate-100 text-slate-900 flex items-center justify-center shadow-sm" data-panel-target="home">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h4m4 0h4a1 1 0 001-1V10" />
+              </svg>
+            </button>
+
+            <!-- Transactions icon -->
+            <button class="w-10 h-10 rounded-full bg-white text-slate-500 hover:bg-slate-100 flex items-center justify-center shadow-sm" data-panel-target="transactions">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+              </svg>
+            </button>
+
+            <!-- Affordability icon -->
+            <button class="w-10 h-10 rounded-full bg-white text-slate-500 hover:bg-slate-100 flex items-center justify-center shadow-sm" data-panel-target="affordability">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </button>
+
+            <!-- Amenities icon -->
+            <button class="w-10 h-10 rounded-full bg-white text-slate-500 hover:bg-slate-100 flex items-center justify-center shadow-sm" data-panel-target="amenities">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+              </svg>
+            </button>
           </div>
-          <div class="h-6 w-px bg-zinc-700"></div>
-          <span class="text-xs text-zinc-500">INF2003 Project • Team 42</span>
+        </div>
+
+        <!-- Main panel column: header + panels + footer -->
+        <div class="flex-1 flex flex-col">
+          <!-- Header above panels -->
+          <div class="px-6 pt-5 pb-3 border-b border-zinc-200">
+            <h2 id="panel-title" class="text-lg font-semibold tracking-tight">Home search</h2>
+            <p id="panel-subtitle" class="text-xs text-zinc-500">
+              Filter and explore resale flats on the map.
+            </p>
+          </div>
+
+          <!-- Scrollable content area: panel container -->
+          <main class="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+            <!-- Home panel: keep your existing Compare Towns UI here -->
+            <section id="panel-home" data-panel="home" class="space-y-4">
+              {% block content %}{% endblock %}
+            </section>
+
+            <!-- Transactions panel -->
+            <section id="panel-transactions" data-panel="transactions" class="space-y-4 hidden">
+              <div class="grid lg:grid-cols-5 gap-6">
+                <div class="lg:col-span-2 space-y-4">
+                  <div class="p-6 bg-white rounded-xl border border-zinc-200 card-hover">
+                    <h2 class="text-lg font-semibold mb-4">Filters</h2>
+                    
+                    <div class="space-y-4">
+                      <div>
+                        <label class="block text-sm font-medium mb-2 text-zinc-300">Town</label>
+                        <select title="Select Town" id="trans-town" class="w-full bg-slate-100 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                          <option>Loading...</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium mb-2 text-zinc-300">Flat Type</label>
+                        <select title="Select Flat Type" id="trans-flat" class="w-full bg-slate-100 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                          <option>Loading...</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium mb-2 text-zinc-300">Results Limit</label>
+                        <input title="Select Results Limit" id="trans-limit" type="number" value="20" min="5" max="100" class="w-full bg-slate-100 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                      </div>
+
+                      <button id="btn-search-trans" class="w-full py-3 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 font-medium transition-all">
+                        Search Transactions
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="lg:col-span-3">
+                  <div class="p-6 bg-white rounded-xl border border-zinc-200 card-hover">
+                    <div class="flex items-center justify-between mb-4">
+                      <h3 class="text-lg font-semibold">Recent Resale Transactions</h3>
+                      <div id="trans-count" class="text-sm text-zinc-400">0 results</div>
+                    </div>
+                    <div id="trans-loading" class="hidden text-sm text-zinc-400 flex items-center space-x-2">
+                      <div class="spinner"></div>
+                      <span>Loading transactions...</span>
+                    </div>
+                    <div id="trans-list" class="space-y-3"></div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Affordability panel -->
+            <section id="panel-affordability" data-panel="affordability" class="space-y-4 hidden">
+              <div class="grid lg:grid-cols-4 gap-6">
+                <!-- Calculator Input -->
+                <div class="lg:col-span-2 space-y-4">
+                  <div class="p-6 bg-white rounded-xl border border-zinc-200 card-hover">
+                    <h2 class="text-lg font-semibold mb-4 flex items-center space-x-2">
+                      <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                      </svg>
+                      <span>Calculator</span>
+                    </h2>
+                    
+                    <div class="space-y-4">
+                      <div>
+                        <label class="block text-sm font-medium mb-2 text-zinc-300">Monthly Household Income (SGD)</label>
+                        <input id="af-income" type="number" class="w-full bg-slate-100 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent" placeholder="e.g., 9500" value="9500">
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium mb-2 text-zinc-300">Monthly Expenses (SGD)</label>
+                        <input id="af-expenses" type="number" class="w-full bg-slate-100 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent" placeholder="e.g., 2500" value="2500">
+                      </div>
+
+                      <div class="grid grid-cols-2 gap-3">
+                        <div>
+                          <label class="block text-sm font-medium mb-2 text-zinc-300">Interest Rate (%)</label>
+                          <input title="Enter Interest Rate" id="af-interest" type="number" step="0.1" class="w-full bg-slate-100 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent" value="2.6">
+                        </div>
+                        <div>
+                          <label class="block text-sm font-medium mb-2 text-zinc-300">Tenure (years)</label>
+                          <input title="Enter Tenure in Years" id="af-tenure" type="number" class="w-full bg-slate-100 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent" value="25">
+                        </div>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium mb-2 text-zinc-300">Down Payment (%)</label>
+                        <input title="Enter Down Payment Percentage" id="af-downpayment" type="number" step="1" class="w-full bg-slate-100 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent" value="20">
+                      </div>
+
+                      <button id="btn-afford" class="mt-6 w-full py-3 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 font-medium transition-all shadow-lg shadow-emerald-500/30">
+                        Calculate Affordability
+                      </button>
+                      
+                      <div class="p-3 bg-slate-100 rounded-lg border border-slate-200">
+                        <p class="text-xs text-zinc-400 leading-relaxed">
+                          Uses mortgage calculation rules and 30% income threshold for affordability analysis.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Results & Scenarios -->
+                <div class="lg:col-span-2 space-y-4">
+                  <!-- Results Card -->
+                  <div class="p-6 bg-white rounded-xl border border-zinc-200 card-hover">
+                    <h3 class="text-lg font-semibold mb-4">Affordability Results</h3>
+                    <div id="af-result" class="space-y-4">
+                      <div class="text-center text-zinc-400 py-8">
+                        <svg class="w-16 h-16 mx-auto mb-3 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                        </svg>
+                        <p class="text-sm">Enter your details and click Calculate</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Amenities panel -->
+            <section id="panel-amenities" data-panel="amenities" class="space-y-4 hidden">
+              <div class="grid lg:grid-cols-2 gap-6">
+                <!-- Upload Card -->
+                <div class="p-6 bg-white rounded-xl border border-zinc-200 card-hover">
+                  <h2 class="text-lg font-semibold mb-4 flex items-center space-x-2">
+                    <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                    </svg>
+                    <span>Upload Amenity GeoJSON</span>
+                  </h2>
+                  
+                  <form id="amenity-form" class="space-y-4">
+                    <div class="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:border-emerald-500 transition-colors">
+                      <input id="amenity-file" type="file" accept=".geojson,.json" class="hidden" />
+                      <label for="amenity-file" class="cursor-pointer">
+                        <svg class="w-12 h-12 mx-auto mb-3 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                        </svg>
+                        <p class="text-sm text-zinc-400 mb-1">Click to upload or drag and drop</p>
+                        <p class="text-xs text-zinc-500">GeoJSON files only (MRT, Schools, Clinics, etc.)</p>
+                      </label>
+                    </div>
+                    
+                    <div id="amenity-selected" class="hidden p-3 bg-slate-100 rounded-lg border border-slate-200">
+                      <p class="text-sm text-zinc-300" id="amenity-filename"></p>
+                    </div>
+                    
+                    <button type="submit" class="w-full py-3 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 font-medium transition-all">
+                      Upload to MongoDB
+                    </button>
+                  </form>
+                  
+                  <div id="amenity-state" class="mt-4 text-sm"></div>
+                </div>
+
+                <!-- Amenity Stats Card -->
+                <div class="p-6 bg-white rounded-xl border border-zinc-200 card-hover">
+                  <h2 class="text-lg font-semibold mb-4">Amenity Statistics</h2>
+                  
+                  <div class="space-y-4">
+                    <div>
+                      <label class="block text-sm font-medium mb-2 text-zinc-300">Select Town</label>
+                      <select id="amenity-town" class="w-full bg-slate-100 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                        <option value="">All Towns</option>
+                      </select>
+                      <button id="btn-amenity-stats" class="mt-3 w-full px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 font-medium transition-all">
+                        Load
+                      </button>
+                    </div>
+
+                    <div id="amenity-stats" class="grid grid-cols-2 gap-3">
+                      <!-- Stats will be populated here -->
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Data / meta panel -->
+            <section id="panel-data" data-panel="data" class="space-y-4 hidden">
+              <h3 class="text-sm font-semibold">Data &amp; metadata</h3>
+              <p class="text-xs text-zinc-500">Underlying datasets, schemas and notes will appear here.</p>
+            </section>
+          </main>
+
+          <!-- Compact footer in sidebar -->
+          <footer class="px-6 py-4 border-t border-zinc-200 text-[11px] text-zinc-500 space-y-1">
+            <div class="flex flex-wrap justify-between gap-2">
+              <span>INF2003 Database Systems, Team 42</span>
+              <span class="hidden sm:inline">© 2025 HDB HomeFinder DB</span>
+            </div>
+            <p class="text-[10px] text-zinc-500">
+              Data: HDB resale prices, amenities &amp; income statistics. For educational use only.
+            </p>
+          </footer>
         </div>
       </div>
-    </div>
-  </nav>
+    </aside>
 
-  <!-- Main Content -->
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    {% block content %}{% endblock %}
+    <!-- Right column: interactive Mapbox map -->
+    <div class="flex-1 relative">
+      <div
+        id="map"
+        class="absolute inset-0"
+      ></div>
+    </div>
   </div>
 
-  <!-- Footer -->
-  <footer class="border-t border-zinc-800 mt-20">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-8 text-sm text-zinc-400">
-        <div>
-          <h3 class="font-semibold text-zinc-300 mb-2">Data Sources</h3>
-          <ul class="space-y-1">
-            <li>• HDB Resale Flat Prices (data.gov.sg)</li>
-            <li>• MRT/LRT Stations & Schools</li>
-            <li>• Clinics, Supermarkets, Parks</li>
-            <li>• Median Household Income (SingStat)</li>
-          </ul>
-        </div>
-        
-        <div>
-          <h3 class="font-semibold text-zinc-300 mb-2">Technologies</h3>
-          <ul class="space-y-1">
-            <li>• MySQL (Aiven) via SQLAlchemy</li>
-            <li>• MongoDB Atlas via PyMongo</li>
-            <li>• Flask REST API Backend</li>
-            <li>• Tailwind CSS Frontend</li>
-          </ul>
-        </div>
-        
-        <div>
-          <h3 class="font-semibold text-zinc-300 mb-2">Features</h3>
-          <ul class="space-y-1">
-            <li>• Advanced SQL aggregates & window functions</li>
-            <li>• NoSQL GeoJSON amenity storage</li>
-            <li>• Affordability calculator with mortgage rules</li>
-            <li>• Town comparison & trend analysis</li>
-          </ul>
-        </div>
-      </div>
-      
-      <div class="mt-8 pt-8 border-t border-zinc-800 text-center text-xs text-zinc-500">
-        <p>© 2025 SIT INF2003 Database Systems Project • Team 42</p>
-        <p class="mt-1">Gregory Tan, Lucas Ng, Tan Zheng Liang, Neo Chuan Zong, Cheok Zi Hin, Dion Ko</p>
-      </div>
-    </div>
-  </footer>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const buttons = document.querySelectorAll('[data-panel-target]');
+      const panels = document.querySelectorAll('[data-panel]');
+      const titleEl = document.getElementById('panel-title');
+      const subtitleEl = document.getElementById('panel-subtitle');
 
+      const panelMeta = {
+        home: {
+          title: 'Home search',
+          subtitle: 'Filter and explore resale flats on the map.'
+        },
+        transactions: {
+          title: 'Recent transactions',
+          subtitle: 'Browse latest HDB resale deals by town and flat type.'
+        },
+        affordability: {
+          title: 'Affordability tools',
+          subtitle: 'Estimate your budget and see what flats you can afford.'
+        },
+        amenities: {
+          title: 'Amenities & GeoJSON',
+          subtitle: 'Upload and analyse amenity data stored in MongoDB.'
+        },
+        data: {
+          title: 'Data & metadata',
+          subtitle: 'Inspect datasets, schemas and project documentation.'
+        }
+      };
+
+      function showPanel(name) {
+        // Show/hide panels
+        panels.forEach(panel => {
+          if (panel.dataset.panel === name) {
+            panel.classList.remove('hidden');
+          } else {
+            panel.classList.add('hidden');
+          }
+        });
+
+        // Update header text
+        const meta = panelMeta[name] || panelMeta.home;
+        if (titleEl) titleEl.textContent = meta.title;
+        if (subtitleEl) subtitleEl.textContent = meta.subtitle;
+      }
+
+      buttons.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const target = btn.dataset.panelTarget;
+          if (target) {
+            showPanel(target);
+          }
+        });
+      });
+
+      // default view
+      showPanel('home');
+    });
+  </script>
   <script src="{{ url_for('static', filename='js/app.js') }}"></script>
   {% block scripts %}{% endblock %}
 </body>

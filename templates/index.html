@@ -2,25 +2,30 @@
 {% block content %}
 
 <!-- Hero Section -->
-<div class="gradient-bg rounded-2xl p-8 mb-8 border border-zinc-800">
+<div class="rounded-2xl p-8 mb-8 bg-slate-50 border border-zinc-200">
   <div class="flex items-center justify-between flex-wrap gap-4">
     <div>
-      <h2 class="text-3xl font-bold mb-2">Welcome to HDB HomeFinder DB</h2>
+      <h2 class="text-3xl font-bold mb-2">Welcome to HDB HomeFinder</h2>
       <p class="text-zinc-400 max-w-2xl">
         Explore Singapore's public housing resale market with integrated data from HDB transactions, 
-        amenities, and affordability analytics. Powered by MySQL and MongoDB.
+        amenities, and affordability analytics.
       </p>
-    </div>
-    <div class="flex flex-col space-y-2 text-right">
-      <div class="text-2xl font-bold text-emerald-400" id="total-transactions">Loading...</div>
-      <div class="text-xs text-zinc-400">Total Transactions</div>
     </div>
   </div>
 </div>
 
 <!-- Tab Navigation -->
-<div class="mb-6 flex flex-wrap gap-2">
-  <button data-tab="explore" class="ui-tab active px-4 py-2.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 transition-all font-medium text-sm">
+<div class="mb-8 flex flex-wrap items-center gap-3">
+  <button data-tab="explore" class="ui-tab active px-4 py-2 rounded-full bg-slate-100 hover:bg-slate-200 transition-all font-medium text-sm">
+    <span class="flex items-center space-x-2">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+      </svg>
+      <span>Price Trends</span>
+    </span>
+  </button>
+  
+  <button data-tab="compare" class="ui-tab px-4 py-2 rounded-full bg-slate-100 hover:bg-slate-200 transition-all font-medium text-sm">
     <span class="flex items-center space-x-2">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
@@ -29,68 +34,30 @@
     </span>
   </button>
   
-  <button data-tab="transactions" class="ui-tab px-4 py-2.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 transition-all font-medium text-sm">
-    <span class="flex items-center space-x-2">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
-      </svg>
-      <span>Transactions</span>
-    </span>
-  </button>
-  
-  <button data-tab="affordability" class="ui-tab px-4 py-2.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 transition-all font-medium text-sm">
-    <span class="flex items-center space-x-2">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-      </svg>
-      <span>Affordability</span>
-    </span>
-  </button>
-  
-  <button data-tab="compare" class="ui-tab px-4 py-2.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 transition-all font-medium text-sm">
-    <span class="flex items-center space-x-2">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-      </svg>
-      <span>Compare Towns</span>
-    </span>
-  </button>
-  
-  <button data-tab="amenities" class="ui-tab px-4 py-2.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 transition-all font-medium text-sm">
-    <span class="flex items-center space-x-2">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
-      </svg>
-      <span>Amenities & Data</span>
-    </span>
-  </button>
-</div>
-
 <!-- PANEL 1: Explore Trends (SQL Window Functions) -->
 <section id="panel-explore" class="ui-panel animate-fade-in">
-  <div class="grid lg:grid-cols-3 gap-6">
+  <div class="grid lg:grid-cols-5 gap-6">
     <!-- Filters Sidebar -->
-    <div class="lg:col-span-1 space-y-4">
-      <div class="p-6 bg-zinc-900 rounded-xl border border-zinc-800 card-hover">
-        <h2 class="text-lg font-semibold mb-4 flex items-center space-x-2">
-          <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div class="lg:col-span-3 space-y-4">
+      <div class="p-6 bg-white rounded-xl border border-zinc-200 card-hover">
+        <h2 class="text-base font-semibold mb-4 flex items-center space-x-2">
+          <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
           </svg>
-          <span>Search Filters</span>
+          <span>Filters</span>
         </h2>
         
         <div class="space-y-4">
           <div>
             <label class="block text-sm font-medium mb-2 text-zinc-300">Town</label>
-            <select title="Select Town" id="sel-town" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition">
+            <select title="Select Town" id="sel-town" class="w-full bg-slate-100 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition">
               <option>Loading...</option>
             </select>
           </div>
 
           <div>
             <label class="block text-sm font-medium mb-2 text-zinc-300">Flat Type</label>
-            <select title="Select Flat Type" id="sel-flat" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition">
+            <select title="Select Flat Type" id="sel-flat" class="w-full bg-slate-100 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition">
               <option>Loading...</option>
             </select>
           </div>
@@ -98,13 +65,13 @@
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-sm font-medium mb-2 text-zinc-300">Start Month</label>
-              <select title="Select Start Month" id="sel-start" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition">
+              <select title="Select Start Month" id="sel-start" class="w-full bg-slate-100 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition">
                 <option>Loading...</option>
               </select>
             </div>
             <div>
               <label class="block text-sm font-medium mb-2 text-zinc-300">End Month</label>
-              <select title="Select End Month" id="sel-end" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition">
+              <select title="Select End Month" id="sel-end" class="w-full bg-slate-100 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition">
                 <option>Loading...</option>
               </select>
             </div>
@@ -119,19 +86,14 @@
             </span>
           </button>
           
-          <div class="p-3 bg-zinc-800/50 rounded-lg border border-zinc-700/50">
-            <p class="text-xs text-zinc-400 leading-relaxed">
-              <span class="font-semibold text-emerald-400">Advanced SQL:</span> Uses window functions and aggregates to compute median/percentile prices per sqm with trend analysis.
-            </p>
-          </div>
         </div>
       </div>
     </div>
 
     <!-- Results Area -->
-    <div class="lg:col-span-2 space-y-4">
+    <div class="lg:col-span-3 space-y-4">
       <!-- Chart Card -->
-      <div class="p-6 bg-zinc-900 rounded-xl border border-zinc-800 card-hover">
+      <div class="p-6 bg-white rounded-xl border border-zinc-200 card-hover">
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-lg font-semibold">Price Trend Analysis</h3>
           <div id="trend-loading" class="hidden">
@@ -144,7 +106,7 @@
       </div>
 
       <!-- Data Table Card -->
-      <div class="p-6 bg-zinc-900 rounded-xl border border-zinc-800 card-hover">
+      <div class="p-6 bg-white rounded-xl border border-zinc-200 card-hover">
         <h3 class="text-lg font-semibold mb-4">Detailed Statistics</h3>
         <div id="trend-state" class="hidden text-sm text-zinc-400 flex items-center space-x-2">
           <div class="spinner"></div>
@@ -156,170 +118,29 @@
   </div>
 </section>
 
-<!-- PANEL 2: Recent Transactions -->
-<section id="panel-transactions" class="ui-panel hidden">
-  <div class="grid lg:grid-cols-4 gap-6">
-    <div class="lg:col-span-1 space-y-4">
-      <div class="p-6 bg-zinc-900 rounded-xl border border-zinc-800 card-hover">
-        <h2 class="text-lg font-semibold mb-4">Filters</h2>
-        
-        <div class="space-y-4">
-          <div>
-            <label class="block text-sm font-medium mb-2 text-zinc-300">Town</label>
-            <select title="Select Town" id="trans-town" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
-              <option>Loading...</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium mb-2 text-zinc-300">Flat Type</label>
-            <select title="Select Flat Type" id="trans-flat" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
-              <option>Loading...</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium mb-2 text-zinc-300">Results Limit</label>
-            <input title="Select Results Limit" id="trans-limit" type="number" value="20" min="5" max="100" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
-          </div>
-
-          <button id="btn-search-trans" class="w-full py-3 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 font-medium transition-all">
-            Search Transactions
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <div class="lg:col-span-3">
-      <div class="p-6 bg-zinc-900 rounded-xl border border-zinc-800 card-hover">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-semibold">Recent Resale Transactions</h3>
-          <div id="trans-count" class="text-sm text-zinc-400">0 results</div>
-        </div>
-        <div id="trans-loading" class="hidden text-sm text-zinc-400 flex items-center space-x-2">
-          <div class="spinner"></div>
-          <span>Loading transactions...</span>
-        </div>
-        <div id="trans-list" class="space-y-3"></div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- PANEL 3: Affordability Calculator -->
-<section id="panel-affordability" class="ui-panel hidden">
-  <div class="grid lg:grid-cols-3 gap-6">
-    <!-- Calculator Input -->
-    <div class="lg:col-span-1 space-y-4">
-      <div class="p-6 bg-zinc-900 rounded-xl border border-zinc-800 card-hover">
-        <h2 class="text-lg font-semibold mb-4 flex items-center space-x-2">
-          <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
-          </svg>
-          <span>Calculator</span>
-        </h2>
-        
-        <div class="space-y-4">
-          <div>
-            <label class="block text-sm font-medium mb-2 text-zinc-300">Monthly Household Income (SGD)</label>
-            <input id="af-income" type="number" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent" placeholder="e.g., 9500" value="9500">
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium mb-2 text-zinc-300">Monthly Expenses (SGD)</label>
-            <input id="af-expenses" type="number" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent" placeholder="e.g., 2500" value="2500">
-          </div>
-
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-sm font-medium mb-2 text-zinc-300">Interest Rate (%)</label>
-              <input title="Enter Interest Rate" id="af-interest" type="number" step="0.1" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent" value="2.6">
-            </div>
-            <div>
-              <label class="block text-sm font-medium mb-2 text-zinc-300">Tenure (years)</label>
-              <input title="Enter Tenure in Years" id="af-tenure" type="number" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent" value="25">
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium mb-2 text-zinc-300">Down Payment (%)</label>
-            <input title="Enter Down Payment Percentage" id="af-downpayment" type="number" step="1" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent" value="20">
-          </div>
-
-          <button id="btn-afford" class="mt-6 w-full py-3 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 font-medium transition-all shadow-lg shadow-emerald-500/30">
-            Calculate Affordability
-          </button>
-          
-          <div class="p-3 bg-zinc-800/50 rounded-lg border border-zinc-700/50">
-            <p class="text-xs text-zinc-400 leading-relaxed">
-              Uses mortgage calculation rules and 30% income threshold for affordability analysis.
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Results & Scenarios -->
-    <div class="lg:col-span-2 space-y-4">
-      <!-- Results Card -->
-      <div class="p-6 bg-zinc-900 rounded-xl border border-zinc-800 card-hover">
-        <h3 class="text-lg font-semibold mb-4">Affordability Results</h3>
-        <div id="af-result" class="space-y-4">
-          <div class="text-center text-zinc-400 py-8">
-            <svg class="w-16 h-16 mx-auto mb-3 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
-            </svg>
-            <p class="text-sm">Enter your details and click Calculate</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Save Scenario Card -->
-      <div class="p-6 bg-zinc-900 rounded-xl border border-zinc-800 card-hover">
-        <h3 class="text-lg font-semibold mb-4">Save Scenario (MongoDB)</h3>
-        <div class="flex items-center gap-3 mb-4">
-          <input id="sc-name" class="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent" placeholder="Scenario name (e.g., Young couple budget)" />
-          <button id="btn-save-scenario" class="px-4 py-2.5 rounded-lg bg-sky-600 hover:bg-sky-500 font-medium transition-all whitespace-nowrap">
-            Save
-          </button>
-        </div>
-
-        <div>
-          <div class="flex items-center justify-between mb-3">
-            <h4 class="font-semibold text-sm">Saved Scenarios</h4>
-            <button id="btn-refresh-scenarios" class="text-xs px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-lg transition">
-              Refresh
-            </button>
-          </div>
-          <div id="sc-list" class="space-y-2"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
 
 <!-- PANEL 4: Town Comparison -->
 <section id="panel-compare" class="ui-panel hidden">
   <div class="space-y-6">
     <!-- Selection Card -->
-    <div class="p-6 bg-zinc-900 rounded-xl border border-zinc-800 card-hover">
+    <div class="p-6 bg-white rounded-xl border border-zinc-200 card-hover">
       <h2 class="text-lg font-semibold mb-4">Select Towns to Compare</h2>
       <div class="grid md:grid-cols-4 gap-4">
         <div>
           <label class="block text-sm font-medium mb-2 text-zinc-300">Town 1</label>
-          <select title="Select Town 1" id="comp-town1" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+          <select title="Select Town 1" id="comp-town1" class="w-full bg-slate-100 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
             <option>Loading...</option>
           </select>
         </div>
         <div>
           <label class="block text-sm font-medium mb-2 text-zinc-300">Town 2</label>
-          <select title="Select Town 2" id="comp-town2" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+          <select title="Select Town 2" id="comp-town2" class="w-full bg-slate-100 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
             <option>Loading...</option>
           </select>
         </div>
         <div>
           <label class="block text-sm font-medium mb-2 text-zinc-300">Town 3 (Optional)</label>
-          <select title="Select Town 3" id="comp-town3" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+          <select title="Select Town 3" id="comp-town3" class="w-full bg-slate-100 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
             <option value="">-- None --</option>
           </select>
         </div>
@@ -336,106 +157,4 @@
   </div>
 </section>
 
-<!-- PANEL 5: Amenities & Data Management -->
-<section id="panel-amenities" class="ui-panel hidden">
-  <div class="grid lg:grid-cols-2 gap-6">
-    <!-- Upload Card -->
-    <div class="p-6 bg-zinc-900 rounded-xl border border-zinc-800 card-hover">
-      <h2 class="text-lg font-semibold mb-4 flex items-center space-x-2">
-        <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-        </svg>
-        <span>Upload Amenity GeoJSON</span>
-      </h2>
-      
-      <form id="amenity-form" class="space-y-4">
-        <div class="border-2 border-dashed border-zinc-700 rounded-lg p-6 text-center hover:border-emerald-500 transition-colors">
-          <input id="amenity-file" type="file" accept=".geojson,.json" class="hidden" />
-          <label for="amenity-file" class="cursor-pointer">
-            <svg class="w-12 h-12 mx-auto mb-3 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-            </svg>
-            <p class="text-sm text-zinc-400 mb-1">Click to upload or drag and drop</p>
-            <p class="text-xs text-zinc-500">GeoJSON files only (MRT, Schools, Clinics, etc.)</p>
-          </label>
-        </div>
-        
-        <div id="amenity-selected" class="hidden p-3 bg-zinc-800 rounded-lg border border-zinc-700">
-          <p class="text-sm text-zinc-300" id="amenity-filename"></p>
-        </div>
-        
-        <button type="submit" class="w-full py-3 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 font-medium transition-all">
-          Upload to MongoDB
-        </button>
-      </form>
-      
-      <div id="amenity-state" class="mt-4 text-sm"></div>
-      
-      <div class="mt-6 p-4 bg-zinc-800/50 rounded-lg border border-zinc-700/50">
-        <h4 class="font-semibold text-sm mb-2 text-emerald-400">NoSQL Features</h4>
-        <ul class="text-xs text-zinc-400 space-y-1">
-          <li>• Stores GeoJSON amenity snapshots in MongoDB</li>
-          <li>• Flexible schema for varying data structures</li>
-          <li>• Supports location-based queries</li>
-          <li>• Integrates with SQL price data for insights</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- Amenity Stats Card -->
-    <div class="p-6 bg-zinc-900 rounded-xl border border-zinc-800 card-hover">
-      <h2 class="text-lg font-semibold mb-4">Amenity Statistics</h2>
-      
-      <div class="space-y-4">
-        <div>
-          <label class="block text-sm font-medium mb-2 text-zinc-300">Select Town</label>
-          <div class="flex gap-2">
-            <select id="amenity-town" class="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
-              <option value="">All Towns</option>
-            </select>
-            <button id="btn-amenity-stats" class="px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 font-medium transition-all">
-              Load
-            </button>
-          </div>
-        </div>
-
-        <div id="amenity-stats" class="grid grid-cols-2 gap-3">
-          <!-- Stats will be populated here -->
-        </div>
-      </div>
-
-      <div class="mt-6 p-4 bg-zinc-800/50 rounded-lg border border-zinc-700/50">
-        <h4 class="font-semibold text-sm mb-2 text-emerald-400">Project Requirements Met</h4>
-        <ul class="text-xs text-zinc-400 space-y-1">
-          <li>✓ Dual database architecture (MySQL + MongoDB)</li>
-          <li>✓ Advanced SQL (window functions, aggregates)</li>
-          <li>✓ NoSQL flexible schema (GeoJSON, scenarios)</li>
-          <li>✓ CRUD operations on both databases</li>
-          <li>✓ REST API backend with Flask</li>
-          <li>✓ Modern responsive UI with Tailwind</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-</section>
-
-{% endblock %}
-
-{% block scripts %}
-<script>
-// Initialize total transactions counter animation
-async function updateTransactionCount() {
-  try {
-    const response = await fetch('/api/meta');
-    const data = await response.json();
-    // You can add an endpoint to get actual count, for now use placeholder
-    const targetCount = 217253; // Update this with actual count from your data
-    document.getElementById('total-transactions').textContent = targetCount.toLocaleString();
-  } catch (err) {
-    document.getElementById('total-transactions').textContent = '217,253';
-  }
-}
-
-updateTransactionCount();
-</script>
 {% endblock %}
