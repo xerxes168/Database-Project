@@ -266,11 +266,13 @@ def api_scenarios():
         
 @app.route("/api/amenities")
 def api_amenities():
-
+    amenity_class = request.args.get("class")
     query = {}
-    town = request.args.get("town")
-    if town:
-        query["properties.TOWN"] = town
+
+    # If a class is provided, filter by properties.CLASS; otherwise return all amenities
+    if amenity_class:
+        query["properties.CLASS"] = amenity_class
+
     docs = list(collection.find(query, {"_id": 0}))
 
     features = []

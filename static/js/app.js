@@ -93,27 +93,30 @@ function showAmenitiesOnMap(geojson) {
 }
 
 function initAmenitiesPanel() {
-  const townSelect = document.querySelector("#amenity-town");
+  const classSelect = document.querySelector("#amenity-class");
   const loadBtn = document.querySelector("#btn-amenity-stats");
 
   if (!loadBtn) return;
 
   loadBtn.addEventListener("click", async () => {
     try {
-      const town = townSelect ? townSelect.value : "";
-      const params = town ? `?town=${encodeURIComponent(town)}` : "";
-      
-      console.log("Loading amenities for town:", town); // debug
+      const amenityClass = classSelect ? classSelect.value : "";
 
-      const res = await fetch(`/api/amenities${params}`);
+      const params = new URLSearchParams();
+      if (amenityClass) {
+        params.set("class", amenityClass);
+      }
+
+      const queryString = params.toString() ? `?${params.toString()}` : "";
+      const res = await fetch(`/api/amenities${queryString}`);
+
       if (!res.ok) {
         console.error("Failed to fetch amenities:", res.statusText);
         return;
       }
 
       const geojson = await res.json();
-      console.log("Amenities GeoJSON:", geojson); // debug
-
+      console.log("Amenities GeoJSON:", geojson);  // debug
       showAmenitiesOnMap(geojson);
     } catch (err) {
       console.error("Error loading amenities:", err);
@@ -575,23 +578,28 @@ async function setupAmenitiesPanel() {
   const amenityFile = $("#amenity-file");
   const amenitySelected = $("#amenity-selected");
   const amenityFilename = $("#amenity-filename");
-  
+
+  // If the upload UI is not present, skip setting up this panel
+  if (!amenityFile) {
+    return;
+  }
+
   amenityFile.addEventListener("change", (e) => {
     if (e.target.files.length > 0) {
       amenitySelected.classList.remove("hidden");
       amenityFilename.textContent = `Selected: ${e.target.files[0].name}`;
     }
   });
-  
+
   $("#amenity-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const file = amenityFile.files[0];
-    
+
     if (!file) {
       alert("Please select a file");
       return;
     }
-    
+
     const amenityState = $("#amenity-state");
     amenityState.innerHTML = `
       <div class="flex items-center space-x-2 text-zinc-400">
@@ -599,14 +607,14 @@ async function setupAmenitiesPanel() {
         <span>Uploading to MongoDB...</span>
       </div>
     `;
-    
+
     try {
       const fd = new FormData();
       fd.append("file", file);
-      
+
       const r = await fetch("/api/amenities/upload", { method: "POST", body: fd });
       const j = await r.json();
-      
+
       if (j.ok) {
         amenityState.innerHTML = `
           <div class="p-3 bg-emerald-900/20 border border-emerald-500/50 rounded-lg text-emerald-400 text-sm">
@@ -626,20 +634,20 @@ async function setupAmenitiesPanel() {
       showError(amenityState, err.message);
     }
   });
-  
+
   $("#btn-amenity-stats").addEventListener("click", async () => {
     const statsDiv = $("#amenity-stats");
     const town = $("#amenity-town").value;
-    
+
     statsDiv.innerHTML = `
       <div class="col-span-2 flex items-center justify-center py-8">
         <div class="spinner"></div>
       </div>
     `;
-    
+
     try {
       const res = await getJSON(`/api/amenities/stats?town=${encodeURIComponent(town)}`);
-      
+
       if (res.ok && res.stats) {
         const stats = res.stats;
         statsDiv.innerHTML = `

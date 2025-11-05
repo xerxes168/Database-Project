@@ -334,58 +334,26 @@
 
             <!-- Amenities panel -->
             <section id="panel-amenities" data-panel="amenities" class="space-y-4 hidden">
-              <div class="grid lg:grid-cols-2 gap-6">
-                <!-- Upload Card -->
-                <div class="p-6 bg-white rounded-xl border border-zinc-200 card-hover">
-                  <h2 class="text-lg font-semibold mb-4 flex items-center space-x-2">
-                    <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-                    </svg>
-                    <span>Upload Amenity GeoJSON</span>
-                  </h2>
-                  
-                  <form id="amenity-form" class="space-y-4">
-                    <div class="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:border-emerald-500 transition-colors">
-                      <input id="amenity-file" type="file" accept=".geojson,.json" class="hidden" />
-                      <label for="amenity-file" class="cursor-pointer">
-                        <svg class="w-12 h-12 mx-auto mb-3 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-                        </svg>
-                        <p class="text-sm text-zinc-400 mb-1">Click to upload or drag and drop</p>
-                        <p class="text-xs text-zinc-500">GeoJSON files only (MRT, Schools, Clinics, etc.)</p>
-                      </label>
-                    </div>
-                    
-                    <div id="amenity-selected" class="hidden p-3 bg-slate-100 rounded-lg border border-slate-200">
-                      <p class="text-sm text-zinc-300" id="amenity-filename"></p>
-                    </div>
-                    
-                    <button type="submit" class="w-full py-3 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 font-medium transition-all">
-                      Upload to MongoDB
+              <div class="p-6 bg-white rounded-xl border border-zinc-200 card-hover">
+                <h2 class="text-lg font-semibold mb-4">Amenity Statistics</h2>
+                
+                <div class="space-y-4">
+                  <div>
+                    <label class="block text-sm font-medium mb-2 text-zinc-300">Amenity Type</label>
+                    <select id="amenity-class" class="w-full bg-slate-100 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                      <option value="">All amenities</option>
+                      <option value="CLINIC">Clinics</option>
+                      <option value="SUPERMARKET">Supermarkets</option>
+                      <option value="MRT_STATION">MRT stations</option>
+                      <option value="SCHOOL">Schools</option>
+                    </select>
+                    <button id="btn-amenity-stats" class="mt-3 w-full px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 font-medium transition-all">
+                      Load
                     </button>
-                  </form>
-                  
-                  <div id="amenity-state" class="mt-4 text-sm"></div>
-                </div>
+                  </div>
 
-                <!-- Amenity Stats Card -->
-                <div class="p-6 bg-white rounded-xl border border-zinc-200 card-hover">
-                  <h2 class="text-lg font-semibold mb-4">Amenity Statistics</h2>
-                  
-                  <div class="space-y-4">
-                    <div>
-                      <label class="block text-sm font-medium mb-2 text-zinc-300">Select Town</label>
-                      <select id="amenity-town" class="w-full bg-slate-100 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
-                        <option value="">All Towns</option>
-                      </select>
-                      <button id="btn-amenity-stats" class="mt-3 w-full px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 font-medium transition-all">
-                        Load
-                      </button>
-                    </div>
-
-                    <div id="amenity-stats" class="grid grid-cols-2 gap-3">
-                      <!-- Stats will be populated here -->
-                    </div>
+                  <div id="amenity-stats" class="grid grid-cols-2 gap-3">
+                    <!-- Stats / counts will be populated here -->
                   </div>
                 </div>
               </div>
