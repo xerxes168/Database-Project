@@ -3,6 +3,7 @@ from flask import Flask, render_template, request, jsonify
 from werkzeug.utils import secure_filename
 import os, json
 from datetime import datetime
+from pymongo import MongoClient
 
 # --- Database imports ---
 from db_mysql import (
@@ -20,6 +21,11 @@ app = Flask(__name__)
 app.config["UPLOAD_FOLDER"] = os.path.join("data", "uploads")
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB max file size
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+
+MONGO_URI = os.environ.get('MONGO_URI', 'mongodb+srv://greggy_dbuser:JesusKing@homefinder-mongo.7d67tvq.mongodb.net/')
+client = MongoClient(MONGO_URI)
+db = client['homefinder']
+collection = db['amenities']
 
 # Initialize MongoDB on startup
 initialize_mongodb()
@@ -257,6 +263,26 @@ def api_scenarios():
             return jsonify({"ok": True, "deleted": scenario_id})
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)}), 500
+        
+@app.route("/api/amenities")
+def api_amenities():
+
+    query = {}
+    town = request.args.get("town")
+    if town:
+        query["properties.TOWN"] = town
+    docs = list(collection.find(query, {"_id": 0}))
+
+    features = []
+    for doc in docs:
+        if doc.get("type") == "Feature" and "geometry" in doc:
+            features.append(doc)
+
+    geojson = {
+        "type": "FeatureCollection",
+        "features": features
+    }
+    return jsonify(geojson)
 
 # --- Health Check ---
 @app.route("/api/health", methods=["GET"])

@@ -5,6 +5,7 @@ const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
 let trendChart = null;
 let hdbMap = null;
+let amenityMarkers = [];
 
 function initMapbox() {
   const mapEl = document.getElementById("map");
@@ -31,6 +32,95 @@ function initMapbox() {
     hdbMap.resize();
   });
 }
+
+function clearAmenityMarkers() {
+  amenityMarkers.forEach(m => m.remove());
+  amenityMarkers = [];
+}
+
+function showAmenitiesOnMap(geojson) {
+  if (!hdbMap || !geojson || !geojson.features) return;
+
+  clearAmenityMarkers();
+
+  const coordsList = [];
+
+  geojson.features.forEach((feature) => {
+    const geom = feature.geometry;
+    const props = feature.properties || {};
+    if (!geom || geom.type !== "Point" || !Array.isArray(geom.coordinates)) return;
+
+    const [lng, lat] = geom.coordinates;
+    coordsList.push([lng, lat]);
+
+    // Create a DOM element for our custom marker
+    const el = document.createElement("div");
+    el.className = "amenity-marker";
+
+    const cls = props.CLASS || "Amenity";
+    const name = props.NAME || "Unnamed amenity";
+
+    const popupHtml = `
+      <div style="min-width: 220px;">
+        <div style="font-weight: 600; margin-bottom: 4px;">${name}</div>
+        <div style="font-size: 12px; color: #6b7280; margin-bottom: 2px;">
+          Type: <span style="font-weight: 500;">${cls}</span>
+        </div>
+        <div style="font-size: 11px; color: #9ca3af;">
+          Lon: ${lng.toFixed(5)}, Lat: ${lat.toFixed(5)}
+        </div>
+      </div>
+    `;
+
+    const popup = new mapboxgl.Popup({ offset: 16 }).setHTML(popupHtml);
+
+    const marker = new mapboxgl.Marker(el)
+      .setLngLat([lng, lat])
+      .setPopup(popup)
+      .addTo(hdbMap);
+
+    amenityMarkers.push(marker);
+  });
+
+  // Zoom to fit all markers
+  if (coordsList.length > 0) {
+    const bounds = coordsList.reduce(
+      (b, c) => b.extend(c),
+      new mapboxgl.LngLatBounds(coordsList[0], coordsList[0])
+    );
+    hdbMap.fitBounds(bounds, { padding: 40, maxZoom: 15 });
+  }
+}
+
+function initAmenitiesPanel() {
+  const townSelect = document.querySelector("#amenity-town");
+  const loadBtn = document.querySelector("#btn-amenity-stats");
+
+  if (!loadBtn) return;
+
+  loadBtn.addEventListener("click", async () => {
+    try {
+      const town = townSelect ? townSelect.value : "";
+      const params = town ? `?town=${encodeURIComponent(town)}` : "";
+      
+      console.log("Loading amenities for town:", town); // debug
+
+      const res = await fetch(`/api/amenities${params}`);
+      if (!res.ok) {
+        console.error("Failed to fetch amenities:", res.statusText);
+        return;
+      }
+
+      const geojson = await res.json();
+      console.log("Amenities GeoJSON:", geojson); // debug
+
+      showAmenitiesOnMap(geojson);
+    } catch (err) {
+      console.error("Error loading amenities:", err);
+    }
+  });
+}
+
 
 // ========== API HELPERS ==========
 async function getJSON(url) {
@@ -573,6 +663,7 @@ async function bootstrap() {
   initMapbox();
   // Setup tab system
   useTabs();
+  initAmenitiesPanel();
   
   try {
     // Load metadata for dropdowns
