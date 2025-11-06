@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" class="scroll-smooth">
+<html lang="en" class="scroll-smooth h-full">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -74,7 +74,7 @@
 
     .card-hover:hover {
       transform: translateY(-2px);
-      box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.2);
+      box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.15);
     }
 
     .animate-fade-in {
@@ -105,36 +105,58 @@
     }
 
     ::-webkit-scrollbar-track {
-      background: #18181b;
+      background: #f4f4f5;
     }
 
     ::-webkit-scrollbar-thumb {
-      background: #3f3f46;
+      background: #d4d4d8;
       border-radius: 4px;
     }
 
     ::-webkit-scrollbar-thumb:hover {
-      background: #52525b;
+      background: #a1a1aa;
     }
-    .amenity-marker {
-      width: 14px;
-      height: 14px;
-      border-radius: 9999px;
-      background: #10b981;               /* emerald */
+    
+    /* Custom amenity markers with icons */
+    .amenity-marker-custom {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       border: 2px solid #ffffff;
-      box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.15);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
       cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+
+    .amenity-marker-custom:hover {
+      transform: scale(1.15);
+      z-index: 10;
+    }
+
+    .amenity-icon {
+      font-size: 18px;
+      line-height: 1;
+    }
+
+    /* Fix for sidebar scrolling */
+    .sidebar-content {
+      height: calc(100vh - 4rem);
+      overflow-y: auto;
+      overflow-x: hidden;
     }
   </style>
 
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 
-<body class="bg-zinc-950 text-zinc-100 min-h-screen antialiased">
-  <div class="flex min-h-screen">
+<body class="bg-zinc-950 text-zinc-100 h-full antialiased overflow-hidden">
+  <div class="flex h-full">
     <aside class="w-full max-w-xl bg-white text-slate-900 border-r border-zinc-200 flex flex-col shadow-xl">
       <!-- Header: HDB HomeFinder title on top left -->
-      <nav class="px-6 py-4 border-b border-zinc-200 flex items-center justify-between">
+      <nav class="px-6 py-4 border-b border-zinc-200 flex items-center justify-between flex-shrink-0">
         <div class="flex items-center space-x-3">
           <div class="relative flex items-center justify-center">
             <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 via-emerald-600 to-emerald-700 shadow-md flex items-center justify-center ring-2 ring-emerald-100">
@@ -152,7 +174,7 @@
             <h1 class="text-[1.15rem] font-semibold tracking-tight">
               HDB HomeFinder
             </h1>
-            <p class="text-[11px] text-zinc-400">
+            <p class="text-[11px] text-zinc-500">
               Find affordable resale homes across Singapore
             </p>
           </div>
@@ -161,31 +183,31 @@
 
       <div class="flex flex-1 overflow-hidden">
         <!-- Icon rail like the logistics UI -->
-        <div class="w-14 bg-slate-50 border-r border-zinc-200 flex flex-col items-center justify-between py-4">
+        <div class="w-14 bg-slate-50 border-r border-zinc-200 flex flex-col items-center justify-between py-4 flex-shrink-0">
           <div class="space-y-4">
             <!-- Primary home icon -->
-            <button class="w-10 h-10 rounded-full bg-slate-100 text-slate-900 flex items-center justify-center shadow-sm" data-panel-target="home">
+            <button class="w-10 h-10 rounded-full bg-slate-100 text-slate-900 flex items-center justify-center shadow-sm hover:bg-slate-200 transition" data-panel-target="home">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h4m4 0h4a1 1 0 001-1V10" />
               </svg>
             </button>
 
             <!-- Transactions icon -->
-            <button class="w-10 h-10 rounded-full bg-white text-slate-500 hover:bg-slate-100 flex items-center justify-center shadow-sm" data-panel-target="transactions">
+            <button class="w-10 h-10 rounded-full bg-white text-slate-500 hover:bg-slate-100 flex items-center justify-center shadow-sm transition" data-panel-target="transactions">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
               </svg>
             </button>
 
             <!-- Affordability icon -->
-            <button class="w-10 h-10 rounded-full bg-white text-slate-500 hover:bg-slate-100 flex items-center justify-center shadow-sm" data-panel-target="affordability">
+            <button class="w-10 h-10 rounded-full bg-white text-slate-500 hover:bg-slate-100 flex items-center justify-center shadow-sm transition" data-panel-target="affordability">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
               </svg>
             </button>
 
             <!-- Amenities icon -->
-            <button class="w-10 h-10 rounded-full bg-white text-slate-500 hover:bg-slate-100 flex items-center justify-center shadow-sm" data-panel-target="amenities">
+            <button class="w-10 h-10 rounded-full bg-white text-slate-500 hover:bg-slate-100 flex items-center justify-center shadow-sm transition" data-panel-target="amenities">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
@@ -195,17 +217,17 @@
         </div>
 
         <!-- Main panel column: header + panels + footer -->
-        <div class="flex-1 flex flex-col">
+        <div class="flex-1 flex flex-col overflow-hidden">
           <!-- Header above panels -->
-          <div class="px-6 pt-5 pb-3 border-b border-zinc-200">
-            <h2 id="panel-title" class="text-lg font-semibold tracking-tight">Home search</h2>
-            <p id="panel-subtitle" class="text-xs text-zinc-500">
+          <div class="px-6 pt-5 pb-3 border-b border-zinc-200 flex-shrink-0">
+            <h2 id="panel-title" class="text-lg font-semibold tracking-tight text-slate-900">Home search</h2>
+            <p id="panel-subtitle" class="text-xs text-zinc-600">
               Filter and explore resale flats on the map.
             </p>
           </div>
 
           <!-- Scrollable content area: panel container -->
-          <main class="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          <main class="flex-1 overflow-y-auto px-6 py-4 space-y-4 sidebar-content">
             <!-- Home panel: keep your existing Compare Towns UI here -->
             <section id="panel-home" data-panel="home" class="space-y-4">
               {% block content %}{% endblock %}
@@ -216,29 +238,29 @@
               <div class="grid lg:grid-cols-5 gap-6">
                 <div class="lg:col-span-2 space-y-4">
                   <div class="p-6 bg-white rounded-xl border border-zinc-200 card-hover">
-                    <h2 class="text-lg font-semibold mb-4">Filters</h2>
+                    <h2 class="text-lg font-semibold mb-4 text-slate-900">Filters</h2>
                     
                     <div class="space-y-4">
                       <div>
-                        <label class="block text-sm font-medium mb-2 text-zinc-300">Town</label>
-                        <select title="Select Town" id="trans-town" class="w-full bg-slate-100 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                        <label class="block text-sm font-medium mb-2 text-zinc-700">Town</label>
+                        <select title="Select Town" id="trans-town" class="w-full bg-slate-100 border border-slate-300 text-slate-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
                           <option>Loading...</option>
                         </select>
                       </div>
 
                       <div>
-                        <label class="block text-sm font-medium mb-2 text-zinc-300">Flat Type</label>
-                        <select title="Select Flat Type" id="trans-flat" class="w-full bg-slate-100 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                        <label class="block text-sm font-medium mb-2 text-zinc-700">Flat Type</label>
+                        <select title="Select Flat Type" id="trans-flat" class="w-full bg-slate-100 border border-slate-300 text-slate-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
                           <option>Loading...</option>
                         </select>
                       </div>
 
                       <div>
-                        <label class="block text-sm font-medium mb-2 text-zinc-300">Results Limit</label>
-                        <input title="Select Results Limit" id="trans-limit" type="number" value="20" min="5" max="100" class="w-full bg-slate-100 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                        <label class="block text-sm font-medium mb-2 text-zinc-700">Results Limit</label>
+                        <input title="Select Results Limit" id="trans-limit" type="number" value="20" min="5" max="100" class="w-full bg-slate-100 border border-slate-300 text-slate-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
                       </div>
 
-                      <button id="btn-search-trans" class="w-full py-3 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 font-medium transition-all">
+                      <button id="btn-search-trans" class="w-full py-3 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 font-medium transition-all text-white">
                         Search Transactions
                       </button>
                     </div>
@@ -248,10 +270,10 @@
                 <div class="lg:col-span-3">
                   <div class="p-6 bg-white rounded-xl border border-zinc-200 card-hover">
                     <div class="flex items-center justify-between mb-4">
-                      <h3 class="text-lg font-semibold">Recent Resale Transactions</h3>
-                      <div id="trans-count" class="text-sm text-zinc-400">0 results</div>
+                      <h3 class="text-lg font-semibold text-slate-900">Recent Resale Transactions</h3>
+                      <div id="trans-count" class="text-sm text-zinc-600 font-medium">0 results</div>
                     </div>
-                    <div id="trans-loading" class="hidden text-sm text-zinc-400 flex items-center space-x-2">
+                    <div id="trans-loading" class="hidden text-sm text-zinc-600 flex items-center space-x-2">
                       <div class="spinner"></div>
                       <span>Loading transactions...</span>
                     </div>
@@ -267,7 +289,7 @@
                 <!-- Calculator Input -->
                 <div class="lg:col-span-2 space-y-4">
                   <div class="p-6 bg-white rounded-xl border border-zinc-200 card-hover">
-                    <h2 class="text-lg font-semibold mb-4 flex items-center space-x-2">
+                    <h2 class="text-lg font-semibold mb-4 flex items-center space-x-2 text-slate-900">
                       <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
                       </svg>
@@ -276,37 +298,37 @@
                     
                     <div class="space-y-4">
                       <div>
-                        <label class="block text-sm font-medium mb-2 text-zinc-300">Monthly Household Income (SGD)</label>
-                        <input id="af-income" type="number" class="w-full bg-slate-100 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent" placeholder="e.g., 9500" value="9500">
+                        <label class="block text-sm font-medium mb-2 text-zinc-700">Monthly Household Income (SGD)</label>
+                        <input id="af-income" type="number" class="w-full bg-slate-100 border border-slate-300 text-slate-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent" placeholder="e.g., 9500" value="9500">
                       </div>
 
                       <div>
-                        <label class="block text-sm font-medium mb-2 text-zinc-300">Monthly Expenses (SGD)</label>
-                        <input id="af-expenses" type="number" class="w-full bg-slate-100 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent" placeholder="e.g., 2500" value="2500">
+                        <label class="block text-sm font-medium mb-2 text-zinc-700">Monthly Expenses (SGD)</label>
+                        <input id="af-expenses" type="number" class="w-full bg-slate-100 border border-slate-300 text-slate-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent" placeholder="e.g., 2500" value="2500">
                       </div>
 
                       <div class="grid grid-cols-2 gap-3">
                         <div>
-                          <label class="block text-sm font-medium mb-2 text-zinc-300">Interest Rate (%)</label>
-                          <input title="Enter Interest Rate" id="af-interest" type="number" step="0.1" class="w-full bg-slate-100 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent" value="2.6">
+                          <label class="block text-sm font-medium mb-2 text-zinc-700">Interest Rate (%)</label>
+                          <input title="Enter Interest Rate" id="af-interest" type="number" step="0.1" class="w-full bg-slate-100 border border-slate-300 text-slate-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent" value="2.6">
                         </div>
                         <div>
-                          <label class="block text-sm font-medium mb-2 text-zinc-300">Tenure (years)</label>
-                          <input title="Enter Tenure in Years" id="af-tenure" type="number" class="w-full bg-slate-100 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent" value="25">
+                          <label class="block text-sm font-medium mb-2 text-zinc-700">Tenure (years)</label>
+                          <input title="Enter Tenure in Years" id="af-tenure" type="number" class="w-full bg-slate-100 border border-slate-300 text-slate-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent" value="25">
                         </div>
                       </div>
 
                       <div>
-                        <label class="block text-sm font-medium mb-2 text-zinc-300">Down Payment (%)</label>
-                        <input title="Enter Down Payment Percentage" id="af-downpayment" type="number" step="1" class="w-full bg-slate-100 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent" value="20">
+                        <label class="block text-sm font-medium mb-2 text-zinc-700">Down Payment (%)</label>
+                        <input title="Enter Down Payment Percentage" id="af-downpayment" type="number" step="1" class="w-full bg-slate-100 border border-slate-300 text-slate-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent" value="20">
                       </div>
 
-                      <button id="btn-afford" class="mt-6 w-full py-3 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 font-medium transition-all shadow-lg shadow-emerald-500/30">
+                      <button id="btn-afford" class="mt-6 w-full py-3 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 font-medium transition-all shadow-lg shadow-emerald-500/30 text-white">
                         Calculate Affordability
                       </button>
                       
                       <div class="p-3 bg-slate-100 rounded-lg border border-slate-200">
-                        <p class="text-xs text-zinc-400 leading-relaxed">
+                        <p class="text-xs text-zinc-700 leading-relaxed">
                           Uses mortgage calculation rules and 30% income threshold for affordability analysis.
                         </p>
                       </div>
@@ -318,10 +340,10 @@
                 <div class="lg:col-span-2 space-y-4">
                   <!-- Results Card -->
                   <div class="p-6 bg-white rounded-xl border border-zinc-200 card-hover">
-                    <h3 class="text-lg font-semibold mb-4">Affordability Results</h3>
+                    <h3 class="text-lg font-semibold mb-4 text-slate-900">Affordability Results</h3>
                     <div id="af-result" class="space-y-4">
-                      <div class="text-center text-zinc-400 py-8">
-                        <svg class="w-16 h-16 mx-auto mb-3 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <div class="text-center text-zinc-500 py-8">
+                        <svg class="w-16 h-16 mx-auto mb-3 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
                         </svg>
                         <p class="text-sm">Enter your details and click Calculate</p>
@@ -335,25 +357,57 @@
             <!-- Amenities panel -->
             <section id="panel-amenities" data-panel="amenities" class="space-y-4 hidden">
               <div class="p-6 bg-white rounded-xl border border-zinc-200 card-hover">
-                <h2 class="text-lg font-semibold mb-4">Amenity Statistics</h2>
+                <h2 class="text-lg font-semibold mb-4 text-slate-900">Amenity Viewer</h2>
                 
                 <div class="space-y-4">
                   <div>
-                    <label class="block text-sm font-medium mb-2 text-zinc-300">Amenity Type</label>
-                    <select id="amenity-class" class="w-full bg-slate-100 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                    <label class="block text-sm font-medium mb-2 text-zinc-700">Amenity Type</label>
+                    <select id="amenity-class" class="w-full bg-slate-100 border border-slate-300 text-slate-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
                       <option value="">All amenities</option>
                       <option value="CLINIC">Clinics</option>
                       <option value="SUPERMARKET">Supermarkets</option>
                       <option value="MRT_STATION">MRT stations</option>
                       <option value="SCHOOL">Schools</option>
+                      <option value="PARK">Parks</option>
                     </select>
-                    <button id="btn-amenity-stats" class="mt-3 w-full px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 font-medium transition-all">
-                      Load
+                    <button id="btn-amenity-stats" class="mt-3 w-full px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 font-medium transition-all text-white shadow-md">
+                      Load Amenities on Map
                     </button>
                   </div>
 
-                  <div id="amenity-stats" class="grid grid-cols-2 gap-3">
-                    <!-- Stats / counts will be populated here -->
+                  <div id="amenity-loading" class="hidden text-sm text-zinc-600 flex items-center space-x-2 p-3 bg-slate-100 rounded-lg">
+                    <div class="spinner"></div>
+                    <span>Loading amenities...</span>
+                  </div>
+
+                  <div id="amenity-stats" class="grid grid-cols-1 gap-3">
+                    <!-- Stats will be populated here -->
+                  </div>
+
+                  <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div class="text-xs font-semibold text-blue-900 mb-2">Legend</div>
+                    <div class="space-y-1 text-xs text-blue-800">
+                      <div class="flex items-center gap-2">
+                        <span class="text-base">🚇</span>
+                        <span>MRT Stations (Red)</span>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <span class="text-base">🏫</span>
+                        <span>Schools (Blue)</span>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <span class="text-base">🏥</span>
+                        <span>Clinics (Green)</span>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <span class="text-base">🛒</span>
+                        <span>Supermarkets (Orange)</span>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <span class="text-base">🌳</span>
+                        <span>Parks (Green)</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -361,13 +415,13 @@
 
             <!-- Data / meta panel -->
             <section id="panel-data" data-panel="data" class="space-y-4 hidden">
-              <h3 class="text-sm font-semibold">Data &amp; metadata</h3>
-              <p class="text-xs text-zinc-500">Underlying datasets, schemas and notes will appear here.</p>
+              <h3 class="text-sm font-semibold text-slate-900">Data &amp; metadata</h3>
+              <p class="text-xs text-zinc-600">Underlying datasets, schemas and notes will appear here.</p>
             </section>
           </main>
 
           <!-- Compact footer in sidebar -->
-          <footer class="px-6 py-4 border-t border-zinc-200 text-[11px] text-zinc-500 space-y-1">
+          <footer class="px-6 py-4 border-t border-zinc-200 text-[11px] text-zinc-600 space-y-1 flex-shrink-0">
             <div class="flex flex-wrap justify-between gap-2">
               <span>INF2003 Database Systems, Team 42</span>
               <span class="hidden sm:inline">© 2025 HDB HomeFinder DB</span>
@@ -381,7 +435,7 @@
     </aside>
 
     <!-- Right column: interactive Mapbox map -->
-    <div class="flex-1 relative">
+    <div class="flex-1 relative h-full">
       <div
         id="map"
         class="absolute inset-0"
@@ -411,7 +465,7 @@
         },
         amenities: {
           title: 'Amenities & GeoJSON',
-          subtitle: 'Upload and analyse amenity data stored in MongoDB.'
+          subtitle: 'View amenity locations with custom icons on the map.'
         },
         data: {
           title: 'Data & metadata',

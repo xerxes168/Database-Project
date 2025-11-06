@@ -47,7 +47,7 @@ def api_meta():
             "towns": towns,
             "flat_types": flat_types,
             "months": months,
-            "amenity_types": ["MRT", "SCHOOL", "CLINIC", "SUPERMARKET", "PARK"]
+            "amenity_types": ["MRT_STATION", "SCHOOL", "CLINIC", "SUPERMARKET", "PARK"]
         })
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
