@@ -470,45 +470,45 @@ async function setupAffordabilityPanel() {
         </svg>`;
       
       afResult.innerHTML = `
-        <div class="space-y-4">
+        <div class="space-y-3">
           <div class="flex items-center space-x-3 p-4 bg-${statusColor}-50 border-2 border-${statusColor}-500 rounded-lg">
-            <div class="text-${statusColor}-600">${statusIcon}</div>
+            <div class="text-${statusColor}-600 flex-shrink-0">${statusIcon}</div>
             <div class="flex-1 min-w-0">
-              <div class="font-bold text-lg text-${statusColor}-700">
+              <div class="font-bold text-base text-${statusColor}-700">
                 ${res.affordable ? 'Affordable!' : 'May Be Challenging'}
               </div>
-              <div class="text-sm text-${statusColor}-600 font-medium">Based on 30% income threshold</div>
+              <div class="text-xs text-${statusColor}-600 font-medium">Based on 30% income threshold</div>
             </div>
           </div>
           
-          <div class="grid grid-cols-2 gap-3">
-            <div class="p-3 bg-slate-50 rounded-lg border border-zinc-300">
-              <div class="text-[10px] text-zinc-600 font-semibold mb-1 uppercase tracking-wide">Max Property</div>
-              <div class="text-xl font-bold text-emerald-600 break-words">$${Math.round(res.max_property_value).toLocaleString()}</div>
+          <div class="grid grid-cols-2 gap-2">
+            <div class="p-2.5 bg-slate-50 rounded-lg border border-zinc-300">
+              <div class="text-[9px] text-zinc-600 font-semibold mb-1 uppercase tracking-wide">Max Property</div>
+              <div class="text-base font-bold text-emerald-600 leading-tight">${Math.round(res.max_property_value).toLocaleString()}</div>
             </div>
             
-            <div class="p-3 bg-slate-50 rounded-lg border border-zinc-300">
-              <div class="text-[10px] text-zinc-600 font-semibold mb-1 uppercase tracking-wide">Max Loan</div>
-              <div class="text-xl font-bold text-blue-600 break-words">$${Math.round(res.max_loan_amount).toLocaleString()}</div>
+            <div class="p-2.5 bg-slate-50 rounded-lg border border-zinc-300">
+              <div class="text-[9px] text-zinc-600 font-semibold mb-1 uppercase tracking-wide">Max Loan</div>
+              <div class="text-base font-bold text-blue-600 leading-tight">${Math.round(res.max_loan_amount).toLocaleString()}</div>
             </div>
             
-            <div class="p-3 bg-slate-50 rounded-lg border border-zinc-300">
-              <div class="text-[10px] text-zinc-600 font-semibold mb-1 uppercase tracking-wide">Monthly Payment</div>
-              <div class="text-lg font-bold text-zinc-900 break-words">$${Math.round(res.max_monthly_payment).toLocaleString()}</div>
+            <div class="p-2.5 bg-slate-50 rounded-lg border border-zinc-300">
+              <div class="text-[9px] text-zinc-600 font-semibold mb-1 uppercase tracking-wide">Monthly Pay</div>
+              <div class="text-sm font-bold text-zinc-900 leading-tight">${Math.round(res.max_monthly_payment).toLocaleString()}</div>
             </div>
             
-            <div class="p-3 bg-slate-50 rounded-lg border border-zinc-300">
-              <div class="text-[10px] text-zinc-600 font-semibold mb-1 uppercase tracking-wide">Price/sqm</div>
-              <div class="text-lg font-bold text-zinc-900 break-words">$${Math.round(res.max_psm).toLocaleString()}</div>
+            <div class="p-2.5 bg-slate-50 rounded-lg border border-zinc-300">
+              <div class="text-[9px] text-zinc-600 font-semibold mb-1 uppercase tracking-wide">Price/sqm</div>
+              <div class="text-sm font-bold text-zinc-900 leading-tight">${Math.round(res.max_psm).toLocaleString()}</div>
             </div>
           </div>
           
-          <div class="p-4 bg-slate-100 rounded-lg border border-zinc-300">
-            <div class="text-xs text-zinc-700 font-semibold mb-2">Calculation Details</div>
-            <div class="text-sm text-zinc-700 space-y-1">
-              <p>• Down payment: <span class="font-bold text-emerald-600">$${Math.round(res.down_payment_required).toLocaleString()}</span></p>
+          <div class="p-3 bg-slate-100 rounded-lg border border-zinc-300">
+            <div class="text-[10px] text-zinc-700 font-semibold mb-1.5 uppercase tracking-wide">Calculation Details</div>
+            <div class="text-xs text-zinc-700 space-y-0.5 leading-relaxed">
+              <p>• Down payment: <span class="font-bold text-emerald-600">${Math.round(res.down_payment_required).toLocaleString()}</span></p>
               <p>• Interest: <span class="font-semibold">${payload.interest}%</span> over <span class="font-semibold">${payload.tenure_years} years</span></p>
-              <p>• Down payment: <span class="font-semibold">${payload.down_payment_pct}%</span></p>
+              <p>• Down payment %: <span class="font-semibold">${payload.down_payment_pct}%</span></p>
             </div>
           </div>
         </div>
@@ -549,45 +549,45 @@ async function setupComparePanel() {
       
       if (res.ok && res.comparison) {
         results.innerHTML = res.comparison.map(town => `
-          <div class="p-6 bg-slate-50 rounded-xl border border-zinc-300 card-hover">
-            <h3 class="text-xl font-bold mb-2 text-emerald-600">${town.town}</h3>
-            ${town.region ? `<p class="text-xs text-zinc-600 mb-3">${town.region} • ${town.maturity || 'N/A'}</p>` : ''}
+          <div class="p-6 bg-gradient-to-br from-white to-slate-50 rounded-xl border-2 border-zinc-200 hover:border-emerald-400 card-hover shadow-sm">
+            <h3 class="text-2xl font-bold mb-1 bg-gradient-to-r from-emerald-600 to-emerald-500 bg-clip-text text-transparent">${town.town}</h3>
+            ${town.region ? `<p class="text-xs text-zinc-500 mb-4 font-medium uppercase tracking-wide">${town.region} • ${town.maturity || 'N/A'}</p>` : ''}
             
             <div class="space-y-3">
-              <div class="flex justify-between items-center">
-                <span class="text-sm text-zinc-600 font-medium">Median $/sqm</span>
-                <span class="font-bold text-lg text-zinc-900">$${town.median_psm.toLocaleString()}</span>
+              <div class="flex justify-between items-center p-2 bg-white rounded-lg">
+                <span class="text-xs text-zinc-600 font-semibold uppercase tracking-wide">Median $/sqm</span>
+                <span class="font-extrabold text-xl bg-gradient-to-r from-blue-600 to-blue-500 bg-clip-text text-transparent">${town.median_psm.toLocaleString()}</span>
               </div>
               
-              <div class="flex justify-between items-center">
-                <span class="text-sm text-zinc-600 font-medium">Avg Price</span>
-                <span class="font-semibold text-zinc-900">$${town.avg_price.toLocaleString()}</span>
+              <div class="flex justify-between items-center p-2 bg-white rounded-lg">
+                <span class="text-xs text-zinc-600 font-semibold uppercase tracking-wide">Avg Price</span>
+                <span class="font-bold text-lg text-purple-600">${town.avg_price.toLocaleString()}</span>
               </div>
               
-              <div class="flex justify-between items-center">
-                <span class="text-sm text-zinc-600 font-medium">Transactions</span>
-                <span class="font-semibold text-zinc-900">${town.transactions}</span>
+              <div class="flex justify-between items-center p-2 bg-white rounded-lg">
+                <span class="text-xs text-zinc-600 font-semibold uppercase tracking-wide">Transactions</span>
+                <span class="font-bold text-lg text-orange-600">${town.transactions.toLocaleString()}</span>
               </div>
               
               ${town.characteristics && town.characteristics.length > 0 ? `
-                <div class="pt-3 border-t border-zinc-300">
-                  <div class="text-xs text-zinc-600 font-semibold mb-2">Characteristics</div>
-                  <div class="flex flex-wrap gap-1">
+                <div class="pt-3 border-t-2 border-zinc-200">
+                  <div class="text-[10px] text-zinc-600 font-bold mb-2 uppercase tracking-wider">Characteristics</div>
+                  <div class="flex flex-wrap gap-1.5">
                     ${town.characteristics.slice(0, 4).map(c => `
-                      <span class="px-2 py-1 text-xs bg-emerald-100 text-emerald-700 rounded-full">${c}</span>
+                      <span class="px-2.5 py-1 text-[10px] font-semibold bg-gradient-to-r from-emerald-100 to-emerald-50 text-emerald-700 rounded-full border border-emerald-200">${c}</span>
                     `).join('')}
                   </div>
                 </div>
               ` : ''}
               
-              <div class="pt-3 border-t border-zinc-300">
-                <div class="text-xs text-zinc-600 font-semibold mb-1">Affordability Score</div>
+              <div class="pt-3 border-t-2 border-zinc-200">
+                <div class="text-[10px] text-zinc-600 font-bold mb-2 uppercase tracking-wider">Affordability Score</div>
                 <div class="flex items-center space-x-2">
-                  <div class="flex-1 h-2 bg-zinc-300 rounded-full overflow-hidden">
-                    <div class="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full" 
+                  <div class="flex-1 h-3 bg-zinc-200 rounded-full overflow-hidden shadow-inner">
+                    <div class="h-full bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-400 rounded-full transition-all duration-500" 
                          style="width: ${town.affordability_score * 10}%"></div>
                   </div>
-                  <span class="font-bold text-emerald-600">${town.affordability_score}/10</span>
+                  <span class="font-extrabold text-lg bg-gradient-to-r from-emerald-600 to-emerald-500 bg-clip-text text-transparent">${town.affordability_score}/10</span>
                 </div>
               </div>
             </div>
@@ -758,7 +758,7 @@ async function bootstrap() {
       }
     });
     
-    // Populate month selects
+    // Populate month selects (reversed for chronological order - earliest first)
     const startSel = $("#sel-start");
     const endSel = $("#sel-end");
     if (startSel && endSel && meta.months) {
@@ -766,8 +766,9 @@ async function bootstrap() {
       startSel.innerHTML = monthsHTML;
       endSel.innerHTML = monthsHTML;
       if (meta.months.length > 0) {
-        startSel.value = meta.months[0];
-        endSel.value = meta.months[meta.months.length - 1];
+        // Set start to earliest (last in reversed array) and end to most recent (first in reversed array)
+        startSel.value = meta.months[meta.months.length - 1];
+        endSel.value = meta.months[0];
       }
     }
     
