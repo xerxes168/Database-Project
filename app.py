@@ -1,25 +1,38 @@
 # app.py
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, session
 from werkzeug.utils import secure_filename
 import os, json
 from datetime import datetime
 from pymongo import MongoClient
 
-# --- Database imports ---
+# Database imports
 from db_mysql import (
     get_towns, get_flat_types, get_months,
-    query_trends, query_transactions, query_town_comparison
+    query_trends, query_transactions, query_town_comparison,
+    get_total_transaction_count
 )
 from db_mongo import (
-    save_geojson_amenities, list_scenarios, save_scenario, 
-    delete_scenario, get_amenity_stats_by_town, initialize_mongodb,
-    get_amenity_stats_global
+    # Amenities
+    save_geojson_amenities, get_amenity_stats_global, get_amenity_stats_by_town,
+    # Listing Remarks
+    save_listing_remark, search_listing_remarks, get_recent_listings,
+    # User Profiles
+    save_user_profile, get_user_profile, add_search_to_history, 
+    save_listing_to_favorites, get_user_recommendations,
+    # Town Metadata
+    get_town_metadata, get_all_town_metadata, search_towns_by_characteristics,
+    # Scenarios
+    save_scenario, list_scenarios, get_scenario, delete_scenario,
+    # Analytics
+    get_popular_search_terms, get_listing_statistics,
+    # Init
+    initialize_mongodb
 )
 from bson import ObjectId
 
 app = Flask(__name__)
 app.config["UPLOAD_FOLDER"] = os.path.join("data", "uploads")
-app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB max file size
+app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
 MONGO_URI = os.environ.get('MONGO_URI', 'mongodb+srv://greggy_dbuser:JesusKing@homefinder-mongo.7d67tvq.mongodb.net/')
@@ -30,35 +43,40 @@ collection = db['amenities']
 # Initialize MongoDB on startup
 initialize_mongodb()
 
+# Session management - simple demo user
+DEMO_USER_EMAIL = "demo@hdbhomefinder.sg"
+
+
 @app.route("/")
 def index():
     return render_template("index.html")
 
-# --- Reference data for dropdowns ---
+
+# ==================== METADATA ====================
 @app.route("/api/meta", methods=["GET"])
 def api_meta():
-    """Returns metadata for form dropdowns"""
+    """Returns metadata for form dropdowns."""
     try:
         towns = get_towns()
         flat_types = get_flat_types()
         months = get_months()
+        total_transactions = get_total_transaction_count()
         
         return jsonify({
             "towns": towns,
             "flat_types": flat_types,
             "months": months,
+            "total_transactions": total_transactions,
             "amenity_types": ["MRT_STATION", "SCHOOL", "CLINIC", "SUPERMARKET", "PARK"]
         })
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
-# --- SQL Advanced Query: Price trends with window functions ---
+
+# ==================== SQL QUERIES ====================
 @app.route("/api/search/trends", methods=["POST"])
 def api_search_trends():
-    """
-    Advanced SQL query using window functions and aggregates
-    Returns median/percentile prices per sqm by town/flat type/month
-    """
+    """Advanced SQL query with window functions - Price trends analysis."""
     payload = request.get_json() or {}
     town = payload.get("town")
     flat_type = payload.get("flat_type")
@@ -67,6 +85,15 @@ def api_search_trends():
     
     try:
         rows = query_trends(town, flat_type, start_month, end_month)
+        
+        # Track search in user history
+        user_email = session.get("user_email", DEMO_USER_EMAIL)
+        add_search_to_history(user_email, {
+            "town": town,
+            "flat_type": flat_type,
+            "type": "trends"
+        }, len(rows))
+        
         return jsonify({
             "ok": True, 
             "rows": rows,
@@ -75,10 +102,10 @@ def api_search_trends():
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
-# --- SQL Query: Recent transactions ---
+
 @app.route("/api/search/transactions", methods=["POST"])
 def api_search_transactions():
-    """Returns recent individual transactions with details"""
+    """Get recent transactions with details."""
     payload = request.get_json() or {}
     town = payload.get("town")
     flat_type = payload.get("flat_type")
@@ -86,16 +113,63 @@ def api_search_transactions():
     
     try:
         transactions = query_transactions(town, flat_type, limit)
+        
+        # Track search
+        user_email = session.get("user_email", DEMO_USER_EMAIL)
+        add_search_to_history(user_email, {
+            "town": town,
+            "flat_type": flat_type,
+            "type": "transactions"
+        }, len(transactions))
+        
         return jsonify({"ok": True, "transactions": transactions, "count": len(transactions)})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
-# --- Affordability Calculator ---
+
+@app.route("/api/compare/towns", methods=["POST"])
+def api_compare_towns():
+    """Compare multiple towns with integrated data."""
+    payload = request.get_json() or {}
+    towns_list = payload.get("towns", [])
+    flat_type = payload.get("flat_type", "4 ROOM")
+    
+    try:
+        # Get SQL comparison data
+        comparison = query_town_comparison(towns_list, flat_type)
+        
+        # Enrich with MongoDB town metadata
+        for town_data in comparison:
+            town_name = town_data["town"]
+            
+            # Add town metadata
+            metadata = get_town_metadata(town_name)
+            if metadata:
+                town_data["region"] = metadata.get("region", "Unknown")
+                town_data["maturity"] = metadata.get("maturity", "Unknown")
+                town_data["characteristics"] = metadata.get("characteristics", [])
+                town_data["description"] = metadata.get("description", "")
+            
+            # Calculate affordability score
+            median_psm = town_data.get('median_psm', 0)
+            if median_psm > 0:
+                town_data['affordability_score'] = round(max(1, min(10, 10 - (median_psm - 5000) / 500)), 1)
+            else:
+                town_data['affordability_score'] = 5.0
+            
+            # Mock amenity counts (can be enhanced with actual queries)
+            town_data['mrt_count'] = 2
+            town_data['school_count'] = 5
+        
+        return jsonify({"ok": True, "comparison": comparison})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+# ==================== AFFORDABILITY ====================
 @app.route("/api/affordability", methods=["POST"])
 def api_affordability():
-    """
-    Calculates affordability based on income, expenses, and mortgage rules
-    """
+    """Calculate affordability with mortgage rules."""
     payload = request.get_json() or {}
     income = float(payload.get("income", 0))
     expenses = float(payload.get("expenses", 0))
@@ -103,10 +177,8 @@ def api_affordability():
     tenure_years = int(payload.get("tenure_years", 25))
     down_payment_pct = float(payload.get("down_payment_pct", 20))
     
-    # Affordability calculation logic
+    # Affordability calculation
     max_monthly_payment = (income * 0.30) - (expenses * 0.30)
-    
-    # Calculate maximum loan amount using mortgage formula
     monthly_rate = (interest_rate / 100) / 12
     num_payments = tenure_years * 12
     
@@ -115,14 +187,10 @@ def api_affordability():
     else:
         max_loan = max_monthly_payment * num_payments
     
-    # Account for down payment
     max_property_value = max_loan / (1 - down_payment_pct / 100)
-    
-    # Calculate affordable price per sqm (assuming average flat size)
-    avg_flat_size_sqm = 90  # Average 4-room flat
+    avg_flat_size_sqm = 90
     max_psm = max_property_value / avg_flat_size_sqm if max_property_value > 0 else 0
-    
-    affordable = max_property_value >= 300000  # Minimum viable HDB price
+    affordable = max_property_value >= 300000
     
     return jsonify({
         "ok": True,
@@ -134,39 +202,34 @@ def api_affordability():
         "down_payment_required": round(max_property_value * down_payment_pct / 100, 2)
     })
 
-# --- Town Comparison ---
-@app.route("/api/compare/towns", methods=["POST"])
-def api_compare_towns():
-    """Compare multiple towns across various metrics"""
-    payload = request.get_json() or {}
-    towns = payload.get("towns", [])
-    flat_type = payload.get("flat_type", "4 ROOM")
-    
-    try:
-        comparison = query_town_comparison(towns, flat_type)
-        
-        # Add amenity counts and affordability score
-        for town_data in comparison:
-            # Add mock amenity counts (you can enhance this with actual MongoDB queries)
-            town_data['mrt_count'] = 2
-            town_data['school_count'] = 5
-            
-            # Calculate affordability score (inverse of price)
-            median_psm = town_data.get('median_psm', 0)
-            if median_psm > 0:
-                # Score: higher price = lower score (scale 1-10)
-                town_data['affordability_score'] = round(max(1, min(10, 10 - (median_psm - 5000) / 500)), 1)
-            else:
-                town_data['affordability_score'] = 5.0
-        
-        return jsonify({"ok": True, "comparison": comparison})
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
 
-# --- MongoDB: Upload Amenity GeoJSON ---
+# ==================== AMENITIES (MongoDB GeoJSON) ====================
+@app.route("/api/amenities")
+def api_amenities():
+    """Get amenities GeoJSON for map display."""
+    amenity_class = request.args.get("class")
+    query = {}
+
+    if amenity_class:
+        query["properties.CLASS"] = amenity_class
+
+    docs = list(collection.find(query, {"_id": 0}))
+
+    features = []
+    for doc in docs:
+        if doc.get("type") == "Feature" and "geometry" in doc:
+            features.append(doc)
+
+    geojson = {
+        "type": "FeatureCollection",
+        "features": features
+    }
+    return jsonify(geojson)
+
+
 @app.route("/api/amenities/upload", methods=["POST"])
 def api_amenities_upload():
-    """Upload and store GeoJSON amenity data to MongoDB"""
+    """Upload and store GeoJSON amenity data."""
     f = request.files.get("file")
     if not f:
         return jsonify({"ok": False, "error": "No file provided"}), 400
@@ -179,11 +242,9 @@ def api_amenities_upload():
     f.save(path)
     
     try:
-        # Read and validate GeoJSON
         with open(path, 'r') as fp:
             geojson_data = json.load(fp)
         
-        # Store in MongoDB
         features = geojson_data.get('features', [])
         result = save_geojson_amenities(features)
         
@@ -200,17 +261,16 @@ def api_amenities_upload():
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
-# --- MongoDB: Amenity Statistics ---
+
 @app.route("/api/amenities/stats", methods=["GET"])
 def api_amenities_stats():
-    """Get statistics about amenities by town"""
+    """Get amenity statistics."""
     town = request.args.get("town")
     
     try:
         if town:
             stats = get_amenity_stats_by_town(town)
         else:
-            # Global stats
             global_stats = get_amenity_stats_global()
             stats = {
                 "town": "ALL",
@@ -224,28 +284,167 @@ def api_amenities_stats():
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
-# --- MongoDB: Scenario Management ---
+
+# ==================== LISTING REMARKS (MongoDB TEXT SEARCH) ====================
+@app.route("/api/listings/search", methods=["POST"])
+def api_listings_search():
+    """
+    Full-text search on listing remarks.
+    Demonstrates MongoDB text indexing and search capabilities.
+    """
+    payload = request.get_json() or {}
+    query = payload.get("query", "")
+    town = payload.get("town")
+    flat_type = payload.get("flat_type")
+    limit = payload.get("limit", 20)
+    
+    try:
+        if not query:
+            # If no search query, get recent listings
+            results = get_recent_listings(town, limit)
+        else:
+            # Full-text search
+            results = search_listing_remarks(query, town, flat_type, limit)
+        
+        return jsonify({
+            "ok": True,
+            "results": results,
+            "count": len(results),
+            "query": query
+        })
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/listings/recent", methods=["GET"])
+def api_listings_recent():
+    """Get recent listing remarks."""
+    town = request.args.get("town")
+    limit = int(request.args.get("limit", 10))
+    
+    try:
+        results = get_recent_listings(town, limit)
+        return jsonify({"ok": True, "results": results, "count": len(results)})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+# ==================== TOWN METADATA ====================
+@app.route("/api/towns/metadata", methods=["GET"])
+def api_towns_metadata():
+    """Get town metadata with optional filtering."""
+    region = request.args.get("region")
+    maturity = request.args.get("maturity")
+    
+    try:
+        metadata = get_all_town_metadata(region, maturity)
+        return jsonify({"ok": True, "towns": metadata, "count": len(metadata)})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/towns/<town_name>/metadata", methods=["GET"])
+def api_town_metadata_detail(town_name):
+    """Get detailed metadata for a specific town."""
+    try:
+        metadata = get_town_metadata(town_name)
+        if metadata:
+            return jsonify({"ok": True, "metadata": metadata})
+        else:
+            return jsonify({"ok": False, "error": "Town not found"}), 404
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/towns/search-by-characteristics", methods=["POST"])
+def api_towns_search_characteristics():
+    """Search towns by characteristics/tags."""
+    payload = request.get_json() or {}
+    characteristics = payload.get("characteristics", [])
+    
+    try:
+        towns = search_towns_by_characteristics(characteristics)
+        return jsonify({"ok": True, "towns": towns, "count": len(towns)})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+# ==================== USER PROFILES & RECOMMENDATIONS ====================
+@app.route("/api/user/profile", methods=["GET", "POST"])
+def api_user_profile():
+    """Get or create user profile."""
+    if request.method == "GET":
+        user_email = session.get("user_email", DEMO_USER_EMAIL)
+        try:
+            profile = get_user_profile(user_email)
+            if not profile:
+                return jsonify({"ok": False, "error": "Profile not found"}), 404
+            return jsonify({"ok": True, "profile": profile})
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 500
+    
+    else:  # POST
+        payload = request.get_json() or {}
+        try:
+            profile_id = save_user_profile(payload)
+            session["user_email"] = payload.get("email", DEMO_USER_EMAIL)
+            return jsonify({"ok": True, "profile_id": profile_id})
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/user/favorites", methods=["POST"])
+def api_user_add_favorite():
+    """Add listing to user favorites."""
+    payload = request.get_json() or {}
+    user_email = session.get("user_email", DEMO_USER_EMAIL)
+    
+    try:
+        save_listing_to_favorites(
+            user_email,
+            payload.get("block"),
+            payload.get("street"),
+            payload.get("town")
+        )
+        return jsonify({"ok": True, "message": "Added to favorites"})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/user/recommendations", methods=["GET"])
+def api_user_recommendations():
+    """Get personalized town recommendations."""
+    user_email = session.get("user_email", DEMO_USER_EMAIL)
+    
+    try:
+        recommendations = get_user_recommendations(user_email)
+        return jsonify({"ok": True, "recommended_towns": recommendations})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+# ==================== SCENARIOS (MongoDB) ====================
 @app.route("/api/scenarios", methods=["GET", "POST", "DELETE"])
 def api_scenarios():
-    """Manage user affordability scenarios in MongoDB"""
+    """Manage affordability scenarios in MongoDB."""
     
     if request.method == "GET":
+        user_email = request.args.get("user_id", session.get("user_email"))
         try:
-            scenarios = list_scenarios()
+            scenarios = list_scenarios(user_email)
             return jsonify({"ok": True, "items": scenarios})
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)}), 500
     
     elif request.method == "POST":
         payload = request.get_json() or {}
-        
-        # Validate required fields
         required = ["name", "income", "expenses"]
         if not all(k in payload for k in required):
             return jsonify({"ok": False, "error": "Missing required fields"}), 400
         
         try:
             payload["created_at"] = datetime.utcnow()
+            payload["user_id"] = session.get("user_email", DEMO_USER_EMAIL)
             scenario_id = save_scenario(payload)
             payload["_id"] = scenario_id
             
@@ -263,33 +462,35 @@ def api_scenarios():
             return jsonify({"ok": True, "deleted": scenario_id})
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)}), 500
-        
-@app.route("/api/amenities")
-def api_amenities():
-    amenity_class = request.args.get("class")
-    query = {}
 
-    # If a class is provided, filter by properties.CLASS; otherwise return all amenities
-    if amenity_class:
-        query["properties.CLASS"] = amenity_class
 
-    docs = list(collection.find(query, {"_id": 0}))
+# ==================== ANALYTICS & INSIGHTS ====================
+@app.route("/api/analytics/popular-searches", methods=["GET"])
+def api_analytics_popular_searches():
+    """Get popular search terms from user history."""
+    limit = int(request.args.get("limit", 10))
+    
+    try:
+        results = get_popular_search_terms(limit)
+        return jsonify({"ok": True, "popular_searches": results})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
-    features = []
-    for doc in docs:
-        if doc.get("type") == "Feature" and "geometry" in doc:
-            features.append(doc)
 
-    geojson = {
-        "type": "FeatureCollection",
-        "features": features
-    }
-    return jsonify(geojson)
+@app.route("/api/analytics/listings", methods=["GET"])
+def api_analytics_listings():
+    """Get listing statistics."""
+    try:
+        stats = get_listing_statistics()
+        return jsonify({"ok": True, "statistics": stats})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
-# --- Health Check ---
+
+# ==================== HEALTH CHECK ====================
 @app.route("/api/health", methods=["GET"])
 def api_health():
-    """System health check"""
+    """System health check."""
     return jsonify({
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat(),
@@ -297,14 +498,17 @@ def api_health():
         "mongodb_connected": True
     })
 
-# --- Error Handlers ---
+
+# ==================== ERROR HANDLERS ====================
 @app.errorhandler(404)
 def not_found(e):
     return jsonify({"ok": False, "error": "Endpoint not found"}), 404
 
+
 @app.errorhandler(500)
 def server_error(e):
     return jsonify({"ok": False, "error": "Internal server error"}), 500
+
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)

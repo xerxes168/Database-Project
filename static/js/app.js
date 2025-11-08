@@ -9,38 +9,15 @@ let amenityMarkers = [];
 
 // Amenity icon configurations
 const AMENITY_ICONS = {
-  'MRT_STATION': {
-    icon: '🚇',
-    color: '#dc2626', // red
-    label: 'MRT Station'
-  },
-  'SCHOOL': {
-    icon: '🏫',
-    color: '#2563eb', // blue
-    label: 'School'
-  },
-  'CLINIC': {
-    icon: '🏥',
-    color: '#059669', // green
-    label: 'Clinic'
-  },
-  'SUPERMARKET': {
-    icon: '🛒',
-    color: '#ea580c', // orange
-    label: 'Supermarket'
-  },
-  'PARK': {
-    icon: '🌳',
-    color: '#16a34a', // green
-    label: 'Park'
-  },
-  'DEFAULT': {
-    icon: '📍',
-    color: '#10b981', // emerald
-    label: 'Amenity'
-  }
+  'MRT_STATION': { icon: '🚇', color: '#dc2626', label: 'MRT Station' },
+  'SCHOOL': { icon: '🏫', color: '#2563eb', label: 'School' },
+  'CLINIC': { icon: '🏥', color: '#059669', label: 'Clinic' },
+  'SUPERMARKET': { icon: '🛒', color: '#ea580c', label: 'Supermarket' },
+  'PARK': { icon: '🌳', color: '#16a34a', label: 'Park' },
+  'DEFAULT': { icon: '📍', color: '#10b981', label: 'Amenity' }
 };
 
+// ========== MAPBOX INITIALIZATION ==========
 function initMapbox() {
   const mapEl = document.getElementById("map");
   if (!mapEl || typeof mapboxgl === "undefined") {
@@ -91,12 +68,10 @@ function showAmenitiesOnMap(geojson) {
     const [lng, lat] = geom.coordinates;
     coordsList.push([lng, lat]);
 
-    // Get amenity type and corresponding icon
     const amenityType = props.CLASS || props.amenity_type || "DEFAULT";
     const config = getAmenityConfig(amenityType);
     const name = props.NAME || props.name || "Unnamed amenity";
 
-    // Create custom marker with icon
     const el = document.createElement("div");
     el.className = "amenity-marker-custom";
     el.style.backgroundColor = config.color;
@@ -131,7 +106,7 @@ function showAmenitiesOnMap(geojson) {
       (b, c) => b.extend(c),
       new mapboxgl.LngLatBounds(coordsList[0], coordsList[0])
     );
-    hdbMap.fitBounds(bounds, { padding: 60, maxZoom: 13 });
+    hdbMap.fitBounds(bounds, { padding: 40, maxZoom: 15 });
   }
 
   // Update stats display
@@ -563,7 +538,8 @@ async function setupComparePanel() {
       if (res.ok && res.comparison) {
         results.innerHTML = res.comparison.map(town => `
           <div class="p-6 bg-slate-50 rounded-xl border border-zinc-300 card-hover">
-            <h3 class="text-xl font-bold mb-4 text-emerald-600">${town.town}</h3>
+            <h3 class="text-xl font-bold mb-2 text-emerald-600">${town.town}</h3>
+            ${town.region ? `<p class="text-xs text-zinc-600 mb-3">${town.region} • ${town.maturity || 'N/A'}</p>` : ''}
             
             <div class="space-y-3">
               <div class="flex justify-between items-center">
@@ -581,13 +557,16 @@ async function setupComparePanel() {
                 <span class="font-semibold text-zinc-900">${town.transactions}</span>
               </div>
               
-              <div class="pt-3 border-t border-zinc-300">
-                <div class="text-xs text-zinc-600 font-semibold mb-2">Amenities</div>
-                <div class="grid grid-cols-2 gap-2 text-sm text-zinc-700">
-                  <div>MRT: <span class="font-semibold">${town.mrt_count}</span></div>
-                  <div>Schools: <span class="font-semibold">${town.school_count}</span></div>
+              ${town.characteristics && town.characteristics.length > 0 ? `
+                <div class="pt-3 border-t border-zinc-300">
+                  <div class="text-xs text-zinc-600 font-semibold mb-2">Characteristics</div>
+                  <div class="flex flex-wrap gap-1">
+                    ${town.characteristics.slice(0, 4).map(c => `
+                      <span class="px-2 py-1 text-xs bg-emerald-100 text-emerald-700 rounded-full">${c}</span>
+                    `).join('')}
+                  </div>
                 </div>
-              </div>
+              ` : ''}
               
               <div class="pt-3 border-t border-zinc-300">
                 <div class="text-xs text-zinc-600 font-semibold mb-1">Affordability Score</div>
@@ -611,7 +590,88 @@ async function setupComparePanel() {
   });
 }
 
-// ========== PANEL 5: AMENITIES ==========
+// ========== PANEL 5: LISTING REMARKS SEARCH (MongoDB Text Search) ==========
+async function setupListingsPanel() {
+  const btnSearch = $("#btn-search-listings");
+  if (!btnSearch) return;
+
+  btnSearch.addEventListener("click", async () => {
+    const resultsDiv = $("#listing-results");
+    const countDiv = $("#listing-count");
+    const loadingDiv = $("#listing-loading");
+    
+    const query = $("#listing-search-query").value.trim();
+    const town = $("#listing-town-filter").value;
+    const flatType = $("#listing-flat-type-filter").value;
+    
+    if (!query) {
+      resultsDiv.innerHTML = `<p class="text-center text-zinc-600 py-8">Please enter search keywords</p>`;
+      return;
+    }
+    
+    showLoading(loadingDiv, "Searching listings...");
+    
+    try {
+      const res = await postJSON("/api/listings/search", {
+        query: query,
+        town: town || null,
+        flat_type: flatType || null,
+        limit: 20
+      });
+      
+      if (res.ok && res.results) {
+        countDiv.textContent = `${res.count} results`;
+        
+        if (res.count === 0) {
+          resultsDiv.innerHTML = `<p class="text-center text-zinc-600 py-8">No listings found matching "${query}"</p>`;
+        } else {
+          resultsDiv.innerHTML = res.results.map(listing => {
+            // Highlight search terms in remarks
+            let remarksPreview = listing.remarks || 'No description';
+            if (remarksPreview.length > 250) {
+              remarksPreview = remarksPreview.substring(0, 250) + '...';
+            }
+            
+            return `
+              <div class="p-4 bg-white rounded-lg border border-zinc-300 hover:border-emerald-500 transition">
+                <div class="flex items-start justify-between mb-2">
+                  <div class="flex-1">
+                    <div class="font-semibold text-zinc-900">Block ${listing.block}, ${listing.street}</div>
+                    <div class="text-xs text-zinc-600 mt-1">${listing.town} • ${listing.flat_type}</div>
+                  </div>
+                  ${listing.score ? `
+                    <div class="px-2 py-1 text-xs bg-emerald-100 text-emerald-700 rounded-full font-medium">
+                      Match: ${Math.round(listing.score * 100)}%
+                    </div>
+                  ` : ''}
+                </div>
+                <p class="text-sm text-zinc-700 leading-relaxed">${remarksPreview}</p>
+                <div class="mt-2 text-xs text-zinc-500">
+                  Posted: ${new Date(listing.created_date).toLocaleDateString()}
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+      } else {
+        showError(resultsDiv, "Search failed");
+      }
+    } catch (err) {
+      showError(resultsDiv, err.message);
+    } finally {
+      hideLoading(loadingDiv);
+    }
+  });
+  
+  // Allow Enter key to search
+  $("#listing-search-query").addEventListener("keypress", (e) => {
+    if (e.key === "Enter") {
+      btnSearch.click();
+    }
+  });
+}
+
+// ========== PANEL 6: AMENITIES ==========
 async function setupAmenitiesPanel() {
   const classSelect = $("#amenity-class");
   const loadBtn = $("#btn-amenity-stats");
@@ -662,7 +722,8 @@ async function bootstrap() {
   try {
     const meta = await getJSON("/api/meta");
     
-    const townSelects = ["#sel-town", "#trans-town", "#amenity-town", "#comp-town1", "#comp-town2", "#comp-town3"];
+    // Populate town selects
+    const townSelects = ["#sel-town", "#trans-town", "#amenity-town", "#comp-town1", "#comp-town2", "#comp-town3", "#listing-town-filter"];
     townSelects.forEach(sel => {
       const el = $(sel);
       if (el) {
@@ -670,7 +731,8 @@ async function bootstrap() {
       }
     });
     
-    const flatSelects = ["#sel-flat", "#trans-flat"];
+    // Populate flat type selects
+    const flatSelects = ["#sel-flat", "#trans-flat", "#listing-flat-type-filter"];
     flatSelects.forEach(sel => {
       const el = $(sel);
       if (el) {
@@ -678,6 +740,7 @@ async function bootstrap() {
       }
     });
     
+    // Populate month selects
     const startSel = $("#sel-start");
     const endSel = $("#sel-end");
     if (startSel && endSel) {
@@ -688,10 +751,12 @@ async function bootstrap() {
       endSel.value = meta.months[meta.months.length - 1];
     }
     
+    // Setup all panels
     await setupTrendsPanel();
     await setupTransactionsPanel();
     await setupAffordabilityPanel();
     await setupComparePanel();
+    await setupListingsPanel();
     await setupAmenitiesPanel();
     
     console.log("✅ Application ready!");

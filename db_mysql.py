@@ -75,6 +75,16 @@ def get_months():
         """))
         return [row[0] for row in result]
 
+def get_total_transaction_count():
+    """Get total number of transactions in database"""
+    with engine.connect() as conn:
+        result = conn.execute(text("""
+            SELECT COUNT(*) as total
+            FROM resale_flat_prices
+        """))
+        row = result.fetchone()
+        return row[0] if row else 0
+
 # ========== ADVANCED QUERIES ==========
 
 def query_trends(town, flat_type, start_month, end_month):
