@@ -31,6 +31,7 @@ from db_mongo import (
 from bson import ObjectId
 
 app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 app.config["UPLOAD_FOLDER"] = os.path.join("data", "uploads")
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
@@ -41,7 +42,11 @@ db = client['homefinder']
 collection = db['amenities']
 
 # Initialize MongoDB on startup
-initialize_mongodb()
+try:
+    initialize_mongodb()
+    print("✓ MongoDB initialized successfully")
+except Exception as e:
+    print(f"✗ MongoDB initialization warning: {e}")
 
 # Session management - simple demo user
 DEMO_USER_EMAIL = "demo@hdbhomefinder.sg"
@@ -70,7 +75,15 @@ def api_meta():
             "amenity_types": ["MRT_STATION", "SCHOOL", "CLINIC", "SUPERMARKET", "PARK"]
         })
     except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
+        print(f"Error in /api/meta: {e}")
+        return jsonify({
+            "ok": False, 
+            "error": str(e),
+            "towns": [],
+            "flat_types": [],
+            "months": [],
+            "total_transactions": 0
+        }), 500
 
 
 # ==================== SQL QUERIES ====================
@@ -87,12 +100,15 @@ def api_search_trends():
         rows = query_trends(town, flat_type, start_month, end_month)
         
         # Track search in user history
-        user_email = session.get("user_email", DEMO_USER_EMAIL)
-        add_search_to_history(user_email, {
-            "town": town,
-            "flat_type": flat_type,
-            "type": "trends"
-        }, len(rows))
+        try:
+            user_email = session.get("user_email", DEMO_USER_EMAIL)
+            add_search_to_history(user_email, {
+                "town": town,
+                "flat_type": flat_type,
+                "type": "trends"
+            }, len(rows))
+        except Exception as e:
+            print(f"Warning: Could not track search history: {e}")
         
         return jsonify({
             "ok": True, 
@@ -100,6 +116,7 @@ def api_search_trends():
             "filters": {"town": town, "flat_type": flat_type, "start_month": start_month, "end_month": end_month}
         })
     except Exception as e:
+        print(f"Error in /api/search/trends: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
@@ -115,15 +132,19 @@ def api_search_transactions():
         transactions = query_transactions(town, flat_type, limit)
         
         # Track search
-        user_email = session.get("user_email", DEMO_USER_EMAIL)
-        add_search_to_history(user_email, {
-            "town": town,
-            "flat_type": flat_type,
-            "type": "transactions"
-        }, len(transactions))
+        try:
+            user_email = session.get("user_email", DEMO_USER_EMAIL)
+            add_search_to_history(user_email, {
+                "town": town,
+                "flat_type": flat_type,
+                "type": "transactions"
+            }, len(transactions))
+        except Exception as e:
+            print(f"Warning: Could not track search history: {e}")
         
         return jsonify({"ok": True, "transactions": transactions, "count": len(transactions)})
     except Exception as e:
+        print(f"Error in /api/search/transactions: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
@@ -143,12 +164,22 @@ def api_compare_towns():
             town_name = town_data["town"]
             
             # Add town metadata
-            metadata = get_town_metadata(town_name)
-            if metadata:
-                town_data["region"] = metadata.get("region", "Unknown")
-                town_data["maturity"] = metadata.get("maturity", "Unknown")
-                town_data["characteristics"] = metadata.get("characteristics", [])
-                town_data["description"] = metadata.get("description", "")
+            try:
+                metadata = get_town_metadata(town_name)
+                if metadata:
+                    town_data["region"] = metadata.get("region", "Unknown")
+                    town_data["maturity"] = metadata.get("maturity", "Unknown")
+                    town_data["characteristics"] = metadata.get("characteristics", [])
+                    town_data["description"] = metadata.get("description", "")
+                else:
+                    town_data["region"] = "Unknown"
+                    town_data["maturity"] = "Unknown"
+                    town_data["characteristics"] = []
+            except Exception as e:
+                print(f"Warning: Could not fetch metadata for {town_name}: {e}")
+                town_data["region"] = "Unknown"
+                town_data["maturity"] = "Unknown"
+                town_data["characteristics"] = []
             
             # Calculate affordability score
             median_psm = town_data.get('median_psm', 0)
@@ -163,6 +194,7 @@ def api_compare_towns():
         
         return jsonify({"ok": True, "comparison": comparison})
     except Exception as e:
+        print(f"Error in /api/compare/towns: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
@@ -171,36 +203,41 @@ def api_compare_towns():
 def api_affordability():
     """Calculate affordability with mortgage rules."""
     payload = request.get_json() or {}
-    income = float(payload.get("income", 0))
-    expenses = float(payload.get("expenses", 0))
-    interest_rate = float(payload.get("interest", 2.6))
-    tenure_years = int(payload.get("tenure_years", 25))
-    down_payment_pct = float(payload.get("down_payment_pct", 20))
     
-    # Affordability calculation
-    max_monthly_payment = (income * 0.30) - (expenses * 0.30)
-    monthly_rate = (interest_rate / 100) / 12
-    num_payments = tenure_years * 12
-    
-    if monthly_rate > 0:
-        max_loan = max_monthly_payment * ((1 - (1 + monthly_rate) ** -num_payments) / monthly_rate)
-    else:
-        max_loan = max_monthly_payment * num_payments
-    
-    max_property_value = max_loan / (1 - down_payment_pct / 100)
-    avg_flat_size_sqm = 90
-    max_psm = max_property_value / avg_flat_size_sqm if max_property_value > 0 else 0
-    affordable = max_property_value >= 300000
-    
-    return jsonify({
-        "ok": True,
-        "affordable": affordable,
-        "max_property_value": round(max_property_value, 2),
-        "max_loan_amount": round(max_loan, 2),
-        "max_monthly_payment": round(max_monthly_payment, 2),
-        "max_psm": round(max_psm, 2),
-        "down_payment_required": round(max_property_value * down_payment_pct / 100, 2)
-    })
+    try:
+        income = float(payload.get("income", 0))
+        expenses = float(payload.get("expenses", 0))
+        interest_rate = float(payload.get("interest", 2.6))
+        tenure_years = int(payload.get("tenure_years", 25))
+        down_payment_pct = float(payload.get("down_payment_pct", 20))
+        
+        # Affordability calculation
+        max_monthly_payment = (income * 0.30) - (expenses * 0.30)
+        monthly_rate = (interest_rate / 100) / 12
+        num_payments = tenure_years * 12
+        
+        if monthly_rate > 0:
+            max_loan = max_monthly_payment * ((1 - (1 + monthly_rate) ** -num_payments) / monthly_rate)
+        else:
+            max_loan = max_monthly_payment * num_payments
+        
+        max_property_value = max_loan / (1 - down_payment_pct / 100)
+        avg_flat_size_sqm = 90
+        max_psm = max_property_value / avg_flat_size_sqm if max_property_value > 0 else 0
+        affordable = max_property_value >= 300000
+        
+        return jsonify({
+            "ok": True,
+            "affordable": affordable,
+            "max_property_value": round(max_property_value, 2),
+            "max_loan_amount": round(max_loan, 2),
+            "max_monthly_payment": round(max_monthly_payment, 2),
+            "max_psm": round(max_psm, 2),
+            "down_payment_required": round(max_property_value * down_payment_pct / 100, 2)
+        })
+    except Exception as e:
+        print(f"Error in /api/affordability: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 # ==================== AMENITIES (MongoDB GeoJSON) ====================
@@ -213,18 +250,25 @@ def api_amenities():
     if amenity_class:
         query["properties.CLASS"] = amenity_class
 
-    docs = list(collection.find(query, {"_id": 0}))
+    try:
+        docs = list(collection.find(query, {"_id": 0}).limit(1000))
 
-    features = []
-    for doc in docs:
-        if doc.get("type") == "Feature" and "geometry" in doc:
-            features.append(doc)
+        features = []
+        for doc in docs:
+            if doc.get("type") == "Feature" and "geometry" in doc:
+                features.append(doc)
 
-    geojson = {
-        "type": "FeatureCollection",
-        "features": features
-    }
-    return jsonify(geojson)
+        geojson = {
+            "type": "FeatureCollection",
+            "features": features
+        }
+        return jsonify(geojson)
+    except Exception as e:
+        print(f"Error in /api/amenities: {e}")
+        return jsonify({
+            "type": "FeatureCollection",
+            "features": []
+        })
 
 
 @app.route("/api/amenities/upload", methods=["POST"])
@@ -259,6 +303,7 @@ def api_amenities_upload():
     except json.JSONDecodeError:
         return jsonify({"ok": False, "error": "Invalid JSON format"}), 400
     except Exception as e:
+        print(f"Error in /api/amenities/upload: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
@@ -282,6 +327,7 @@ def api_amenities_stats():
         
         return jsonify({"ok": True, "stats": stats})
     except Exception as e:
+        print(f"Error in /api/amenities/stats: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
@@ -313,6 +359,7 @@ def api_listings_search():
             "query": query
         })
     except Exception as e:
+        print(f"Error in /api/listings/search: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
@@ -326,6 +373,7 @@ def api_listings_recent():
         results = get_recent_listings(town, limit)
         return jsonify({"ok": True, "results": results, "count": len(results)})
     except Exception as e:
+        print(f"Error in /api/listings/recent: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
@@ -340,6 +388,7 @@ def api_towns_metadata():
         metadata = get_all_town_metadata(region, maturity)
         return jsonify({"ok": True, "towns": metadata, "count": len(metadata)})
     except Exception as e:
+        print(f"Error in /api/towns/metadata: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
@@ -353,6 +402,7 @@ def api_town_metadata_detail(town_name):
         else:
             return jsonify({"ok": False, "error": "Town not found"}), 404
     except Exception as e:
+        print(f"Error in /api/towns/{town_name}/metadata: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
@@ -366,6 +416,7 @@ def api_towns_search_characteristics():
         towns = search_towns_by_characteristics(characteristics)
         return jsonify({"ok": True, "towns": towns, "count": len(towns)})
     except Exception as e:
+        print(f"Error in /api/towns/search-by-characteristics: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
@@ -381,6 +432,7 @@ def api_user_profile():
                 return jsonify({"ok": False, "error": "Profile not found"}), 404
             return jsonify({"ok": True, "profile": profile})
         except Exception as e:
+            print(f"Error in GET /api/user/profile: {e}")
             return jsonify({"ok": False, "error": str(e)}), 500
     
     else:  # POST
@@ -390,6 +442,7 @@ def api_user_profile():
             session["user_email"] = payload.get("email", DEMO_USER_EMAIL)
             return jsonify({"ok": True, "profile_id": profile_id})
         except Exception as e:
+            print(f"Error in POST /api/user/profile: {e}")
             return jsonify({"ok": False, "error": str(e)}), 500
 
 
@@ -408,6 +461,7 @@ def api_user_add_favorite():
         )
         return jsonify({"ok": True, "message": "Added to favorites"})
     except Exception as e:
+        print(f"Error in /api/user/favorites: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
@@ -420,6 +474,7 @@ def api_user_recommendations():
         recommendations = get_user_recommendations(user_email)
         return jsonify({"ok": True, "recommended_towns": recommendations})
     except Exception as e:
+        print(f"Error in /api/user/recommendations: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
@@ -434,6 +489,7 @@ def api_scenarios():
             scenarios = list_scenarios(user_email)
             return jsonify({"ok": True, "items": scenarios})
         except Exception as e:
+            print(f"Error in GET /api/scenarios: {e}")
             return jsonify({"ok": False, "error": str(e)}), 500
     
     elif request.method == "POST":
@@ -450,6 +506,7 @@ def api_scenarios():
             
             return jsonify({"ok": True, "item": payload})
         except Exception as e:
+            print(f"Error in POST /api/scenarios: {e}")
             return jsonify({"ok": False, "error": str(e)}), 500
     
     else:  # DELETE
@@ -461,6 +518,7 @@ def api_scenarios():
             delete_scenario(scenario_id)
             return jsonify({"ok": True, "deleted": scenario_id})
         except Exception as e:
+            print(f"Error in DELETE /api/scenarios: {e}")
             return jsonify({"ok": False, "error": str(e)}), 500
 
 
@@ -474,6 +532,7 @@ def api_analytics_popular_searches():
         results = get_popular_search_terms(limit)
         return jsonify({"ok": True, "popular_searches": results})
     except Exception as e:
+        print(f"Error in /api/analytics/popular-searches: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
@@ -484,6 +543,7 @@ def api_analytics_listings():
         stats = get_listing_statistics()
         return jsonify({"ok": True, "statistics": stats})
     except Exception as e:
+        print(f"Error in /api/analytics/listings: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
@@ -491,11 +551,26 @@ def api_analytics_listings():
 @app.route("/api/health", methods=["GET"])
 def api_health():
     """System health check."""
+    mysql_ok = False
+    mongo_ok = False
+    
+    try:
+        get_towns()
+        mysql_ok = True
+    except:
+        pass
+    
+    try:
+        from db_mongo import check_database_health
+        mongo_ok = check_database_health()
+    except:
+        pass
+    
     return jsonify({
-        "status": "healthy",
+        "status": "healthy" if (mysql_ok and mongo_ok) else "degraded",
         "timestamp": datetime.utcnow().isoformat(),
-        "mysql_connected": True,
-        "mongodb_connected": True
+        "mysql_connected": mysql_ok,
+        "mongodb_connected": mongo_ok
     })
 
 
@@ -511,4 +586,6 @@ def server_error(e):
 
 
 if __name__ == "__main__":
+    print("🚀 Starting HDB HomeFinder DB...")
+    print(f"📍 Server running on http://0.0.0.0:5000")
     app.run(debug=True, host="0.0.0.0", port=5000)

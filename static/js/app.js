@@ -129,7 +129,7 @@ function updateAmenityStats(count) {
 // ========== API HELPERS ==========
 async function getJSON(url) {
   const r = await fetch(url);
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  if (!r.ok) throw new Error(`HTTP ${r.status}: ${r.statusText}`);
   return r.json();
 }
 
@@ -139,18 +139,19 @@ async function postJSON(url, data) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data || {}),
   });
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  if (!r.ok) throw new Error(`HTTP ${r.status}: ${r.statusText}`);
   return r.json();
 }
 
 async function deleteJSON(url) {
   const r = await fetch(url, { method: "DELETE" });
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  if (!r.ok) throw new Error(`HTTP ${r.status}: ${r.statusText}`);
   return r.json();
 }
 
 // ========== UI HELPERS ==========
 function showLoading(el, text = "Loading...") {
+  if (!el) return;
   el.classList.remove("hidden");
   el.innerHTML = `
     <div class="flex items-center space-x-2">
@@ -161,10 +162,12 @@ function showLoading(el, text = "Loading...") {
 }
 
 function hideLoading(el) {
+  if (!el) return;
   el.classList.add("hidden");
 }
 
 function showError(el, message) {
+  if (!el) return;
   el.innerHTML = `
     <div class="p-4 bg-red-900/20 border border-red-500/50 rounded-lg text-red-400 text-sm">
       <strong>Error:</strong> ${message}
@@ -173,6 +176,8 @@ function showError(el, message) {
 }
 
 function renderTable(el, rows) {
+  if (!el) return;
+  
   if (!rows || !rows.length) {
     el.innerHTML = `<p class="text-sm text-zinc-600 text-center py-8">No results found.</p>`;
     return;
@@ -344,27 +349,28 @@ async function setupTrendsPanel() {
     const trendLoading = $("#trend-loading");
     
     showLoading(trendState, "Running SQL query with window functions...");
-    trendLoading.classList.remove("hidden");
+    if (trendLoading) trendLoading.classList.remove("hidden");
     
     try {
       const res = await postJSON("/api/search/trends", {
-        town: $("#sel-town").value,
-        flat_type: $("#sel-flat").value,
-        start_month: $("#sel-start").value,
-        end_month: $("#sel-end").value
+        town: $("#sel-town")?.value,
+        flat_type: $("#sel-flat")?.value,
+        start_month: $("#sel-start")?.value,
+        end_month: $("#sel-end")?.value
       });
       
-      if (res.ok && res.rows) {
+      if (res.ok && res.rows && res.rows.length > 0) {
         renderTrendChart(res.rows);
         renderTable(trendTable, res.rows);
       } else {
-        showError(trendTable, "No data returned");
+        if (trendTable) showError(trendTable, "No data returned for selected filters");
       }
     } catch (err) {
-      showError(trendTable, err.message);
+      if (trendTable) showError(trendTable, err.message);
+      console.error("Trends query error:", err);
     } finally {
       hideLoading(trendState);
-      trendLoading.classList.add("hidden");
+      if (trendLoading) trendLoading.classList.add("hidden");
     }
   });
 }
@@ -383,37 +389,40 @@ async function setupTransactionsPanel() {
     
     try {
       const res = await postJSON("/api/search/transactions", {
-        town: $("#trans-town").value,
-        flat_type: $("#trans-flat").value,
-        limit: parseInt($("#trans-limit").value)
+        town: $("#trans-town")?.value,
+        flat_type: $("#trans-flat")?.value,
+        limit: parseInt($("#trans-limit")?.value || 20)
       });
       
       if (res.ok && res.transactions) {
-        transCount.textContent = `${res.count} results`;
+        if (transCount) transCount.textContent = `${res.count} results`;
         
-        transList.innerHTML = res.transactions.map(t => `
-          <div class="p-4 bg-slate-50 rounded-lg border border-zinc-300 hover:border-emerald-500 transition">
-            <div class="flex items-start justify-between mb-2">
-              <div>
-                <div class="font-semibold text-zinc-900">Block ${t.block}, ${t.street}</div>
-                <div class="text-xs text-zinc-600 mt-1">${t.storey} • ${t.floor_area} sqm • ${t.remaining_lease}</div>
+        if (transList) {
+          transList.innerHTML = res.transactions.map(t => `
+            <div class="p-4 bg-slate-50 rounded-lg border border-zinc-300 hover:border-emerald-500 transition">
+              <div class="flex items-start justify-between mb-2">
+                <div>
+                  <div class="font-semibold text-zinc-900">Block ${t.block}, ${t.street}</div>
+                  <div class="text-xs text-zinc-600 mt-1">${t.storey} • ${t.floor_area} sqm • ${t.remaining_lease}</div>
+                </div>
+                <div class="text-right">
+                  <div class="text-lg font-bold text-emerald-600">$${t.price.toLocaleString()}</div>
+                  <div class="text-xs text-zinc-600">$${t.psm.toLocaleString()}/sqm</div>
+                </div>
               </div>
-              <div class="text-right">
-                <div class="text-lg font-bold text-emerald-600">$${t.price.toLocaleString()}</div>
-                <div class="text-xs text-zinc-600">$${t.psm.toLocaleString()}/sqm</div>
+              <div class="flex items-center justify-between text-xs text-zinc-500">
+                <span>Lease from ${t.lease_start}</span>
+                <span>${t.month}</span>
               </div>
             </div>
-            <div class="flex items-center justify-between text-xs text-zinc-500">
-              <span>Lease from ${t.lease_start}</span>
-              <span>${t.month}</span>
-            </div>
-          </div>
-        `).join("");
+          `).join("");
+        }
       } else {
-        transList.innerHTML = `<p class="text-center text-zinc-600 py-8">No transactions found</p>`;
+        if (transList) transList.innerHTML = `<p class="text-center text-zinc-600 py-8">No transactions found</p>`;
       }
     } catch (err) {
-      showError(transList, err.message);
+      if (transList) showError(transList, err.message);
+      console.error("Transactions query error:", err);
     } finally {
       hideLoading(transLoading);
     }
@@ -427,6 +436,7 @@ async function setupAffordabilityPanel() {
 
   btnAfford.addEventListener("click", async () => {
     const afResult = $("#af-result");
+    if (!afResult) return;
     
     afResult.innerHTML = `
       <div class="flex items-center justify-center py-8">
@@ -436,11 +446,11 @@ async function setupAffordabilityPanel() {
     
     try {
       const payload = {
-        income: parseFloat($("#af-income").value) || 0,
-        expenses: parseFloat($("#af-expenses").value) || 0,
-        interest: parseFloat($("#af-interest").value) || 2.6,
-        tenure_years: parseInt($("#af-tenure").value) || 25,
-        down_payment_pct: parseFloat($("#af-downpayment").value) || 20,
+        income: parseFloat($("#af-income")?.value) || 0,
+        expenses: parseFloat($("#af-expenses")?.value) || 0,
+        interest: parseFloat($("#af-interest")?.value) || 2.6,
+        tenure_years: parseInt($("#af-tenure")?.value) || 25,
+        down_payment_pct: parseFloat($("#af-downpayment")?.value) || 20,
       };
       
       const res = await postJSON("/api/affordability", payload);
@@ -505,6 +515,7 @@ async function setupAffordabilityPanel() {
       `;
     } catch (err) {
       showError(afResult, err.message);
+      console.error("Affordability calculation error:", err);
     }
   });
 }
@@ -516,6 +527,7 @@ async function setupComparePanel() {
 
   btnCompare.addEventListener("click", async () => {
     const results = $("#compare-results");
+    if (!results) return;
     
     results.innerHTML = `
       <div class="col-span-3 flex items-center justify-center py-12">
@@ -525,14 +537,14 @@ async function setupComparePanel() {
     
     try {
       const towns = [
-        $("#comp-town1").value,
-        $("#comp-town2").value,
-        $("#comp-town3").value
+        $("#comp-town1")?.value,
+        $("#comp-town2")?.value,
+        $("#comp-town3")?.value
       ].filter(t => t);
       
       const res = await postJSON("/api/compare/towns", {
         towns: towns,
-        flat_type: $("#sel-flat").value
+        flat_type: $("#sel-flat")?.value || "4 ROOM"
       });
       
       if (res.ok && res.comparison) {
@@ -586,6 +598,7 @@ async function setupComparePanel() {
       }
     } catch (err) {
       results.innerHTML = `<div class="col-span-3 p-4 bg-red-900/20 border border-red-500/50 rounded-lg text-red-400">${err.message}</div>`;
+      console.error("Town comparison error:", err);
     }
   });
 }
@@ -600,12 +613,12 @@ async function setupListingsPanel() {
     const countDiv = $("#listing-count");
     const loadingDiv = $("#listing-loading");
     
-    const query = $("#listing-search-query").value.trim();
-    const town = $("#listing-town-filter").value;
-    const flatType = $("#listing-flat-type-filter").value;
+    const query = $("#listing-search-query")?.value.trim() || "";
+    const town = $("#listing-town-filter")?.value;
+    const flatType = $("#listing-flat-type-filter")?.value;
     
     if (!query) {
-      resultsDiv.innerHTML = `<p class="text-center text-zinc-600 py-8">Please enter search keywords</p>`;
+      if (resultsDiv) resultsDiv.innerHTML = `<p class="text-center text-zinc-600 py-8">Please enter search keywords</p>`;
       return;
     }
     
@@ -620,55 +633,60 @@ async function setupListingsPanel() {
       });
       
       if (res.ok && res.results) {
-        countDiv.textContent = `${res.count} results`;
+        if (countDiv) countDiv.textContent = `${res.count} results`;
         
         if (res.count === 0) {
-          resultsDiv.innerHTML = `<p class="text-center text-zinc-600 py-8">No listings found matching "${query}"</p>`;
+          if (resultsDiv) resultsDiv.innerHTML = `<p class="text-center text-zinc-600 py-8">No listings found matching "${query}"</p>`;
         } else {
-          resultsDiv.innerHTML = res.results.map(listing => {
-            // Highlight search terms in remarks
-            let remarksPreview = listing.remarks || 'No description';
-            if (remarksPreview.length > 250) {
-              remarksPreview = remarksPreview.substring(0, 250) + '...';
-            }
-            
-            return `
-              <div class="p-4 bg-white rounded-lg border border-zinc-300 hover:border-emerald-500 transition">
-                <div class="flex items-start justify-between mb-2">
-                  <div class="flex-1">
-                    <div class="font-semibold text-zinc-900">Block ${listing.block}, ${listing.street}</div>
-                    <div class="text-xs text-zinc-600 mt-1">${listing.town} • ${listing.flat_type}</div>
-                  </div>
-                  ${listing.score ? `
-                    <div class="px-2 py-1 text-xs bg-emerald-100 text-emerald-700 rounded-full font-medium">
-                      Match: ${Math.round(listing.score * 100)}%
+          if (resultsDiv) {
+            resultsDiv.innerHTML = res.results.map(listing => {
+              let remarksPreview = listing.remarks || 'No description';
+              if (remarksPreview.length > 250) {
+                remarksPreview = remarksPreview.substring(0, 250) + '...';
+              }
+              
+              return `
+                <div class="p-4 bg-white rounded-lg border border-zinc-300 hover:border-emerald-500 transition">
+                  <div class="flex items-start justify-between mb-2">
+                    <div class="flex-1">
+                      <div class="font-semibold text-zinc-900">Block ${listing.block}, ${listing.street}</div>
+                      <div class="text-xs text-zinc-600 mt-1">${listing.town} • ${listing.flat_type}</div>
                     </div>
-                  ` : ''}
+                    ${listing.score ? `
+                      <div class="px-2 py-1 text-xs bg-emerald-100 text-emerald-700 rounded-full font-medium">
+                        Match: ${Math.round(listing.score * 100)}%
+                      </div>
+                    ` : ''}
+                  </div>
+                  <p class="text-sm text-zinc-700 leading-relaxed">${remarksPreview}</p>
+                  <div class="mt-2 text-xs text-zinc-500">
+                    Posted: ${new Date(listing.created_date).toLocaleDateString()}
+                  </div>
                 </div>
-                <p class="text-sm text-zinc-700 leading-relaxed">${remarksPreview}</p>
-                <div class="mt-2 text-xs text-zinc-500">
-                  Posted: ${new Date(listing.created_date).toLocaleDateString()}
-                </div>
-              </div>
-            `;
-          }).join('');
+              `;
+            }).join('');
+          }
         }
       } else {
-        showError(resultsDiv, "Search failed");
+        if (resultsDiv) showError(resultsDiv, "Search failed");
       }
     } catch (err) {
-      showError(resultsDiv, err.message);
+      if (resultsDiv) showError(resultsDiv, err.message);
+      console.error("Listing search error:", err);
     } finally {
       hideLoading(loadingDiv);
     }
   });
   
   // Allow Enter key to search
-  $("#listing-search-query").addEventListener("keypress", (e) => {
-    if (e.key === "Enter") {
-      btnSearch.click();
-    }
-  });
+  const searchInput = $("#listing-search-query");
+  if (searchInput) {
+    searchInput.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") {
+        btnSearch.click();
+      }
+    });
+  }
 }
 
 // ========== PANEL 6: AMENITIES ==========
@@ -726,8 +744,8 @@ async function bootstrap() {
     const townSelects = ["#sel-town", "#trans-town", "#amenity-town", "#comp-town1", "#comp-town2", "#comp-town3", "#listing-town-filter"];
     townSelects.forEach(sel => {
       const el = $(sel);
-      if (el) {
-        el.innerHTML = meta.towns.map(t => `<option value="${t}">${t}</option>`).join("");
+      if (el && meta.towns) {
+        el.innerHTML = '<option value="">All Towns</option>' + meta.towns.map(t => `<option value="${t}">${t}</option>`).join("");
       }
     });
     
@@ -735,20 +753,22 @@ async function bootstrap() {
     const flatSelects = ["#sel-flat", "#trans-flat", "#listing-flat-type-filter"];
     flatSelects.forEach(sel => {
       const el = $(sel);
-      if (el) {
-        el.innerHTML = meta.flat_types.map(t => `<option value="${t}">${t}</option>`).join("");
+      if (el && meta.flat_types) {
+        el.innerHTML = '<option value="">All Types</option>' + meta.flat_types.map(t => `<option value="${t}">${t}</option>`).join("");
       }
     });
     
     // Populate month selects
     const startSel = $("#sel-start");
     const endSel = $("#sel-end");
-    if (startSel && endSel) {
+    if (startSel && endSel && meta.months) {
       const monthsHTML = meta.months.map(m => `<option value="${m}">${m}</option>`).join("");
       startSel.innerHTML = monthsHTML;
       endSel.innerHTML = monthsHTML;
-      startSel.value = meta.months[0];
-      endSel.value = meta.months[meta.months.length - 1];
+      if (meta.months.length > 0) {
+        startSel.value = meta.months[0];
+        endSel.value = meta.months[meta.months.length - 1];
+      }
     }
     
     // Setup all panels

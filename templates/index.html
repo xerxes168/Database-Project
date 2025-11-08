@@ -250,9 +250,16 @@ async function updateTransactionCount() {
     const response = await fetch('/api/meta');
     const data = await response.json();
     const count = data.total_transactions || 217253;
-    document.getElementById('total-transactions').textContent = count.toLocaleString();
+    const el = document.getElementById('total-transactions');
+    if (el) {
+      el.textContent = count.toLocaleString();
+    }
   } catch (err) {
-    document.getElementById('total-transactions').textContent = '217,253';
+    console.error('Failed to fetch transaction count:', err);
+    const el = document.getElementById('total-transactions');
+    if (el) {
+      el.textContent = '217,253';
+    }
   }
 }
 
