@@ -159,6 +159,9 @@ def api_compare_towns():
         # Get SQL comparison data
         comparison = query_town_comparison(towns_list, flat_type)
         
+        # Collect town metadata for map visualization
+        town_metadata_list = []
+        
         # Enrich with MongoDB town metadata
         for town_data in comparison:
             town_name = town_data["town"]
@@ -204,7 +207,11 @@ def api_compare_towns():
             town_data['mrt_count'] = 2
             town_data['school_count'] = 5
         
-        return jsonify({"ok": True, "comparison": comparison})
+        return jsonify({
+            "ok": True, 
+            "comparison": comparison,
+            "town_metadata": town_metadata_list
+        })
     except Exception as e:
         print(f"Error in /api/compare/towns: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
@@ -584,6 +591,46 @@ def api_health():
         "mysql_connected": mysql_ok,
         "mongodb_connected": mongo_ok
     })
+
+
+@app.route("/api/debug/town-metadata", methods=["GET"])
+def api_debug_town_metadata():
+    """Debug endpoint to check town metadata structure."""
+    town_name = request.args.get("town", "ANG MO KIO")
+    
+    try:
+        metadata = get_town_metadata(town_name)
+        
+        if not metadata:
+            return jsonify({
+                "ok": False,
+                "error": f"No metadata found for {town_name}",
+                "suggestion": "Check if town_metadata collection has this town"
+            })
+        
+        # Check required fields
+        has_boundary = "boundary" in metadata
+        has_center = "center_lat" in metadata and "center_lng" in metadata
+        
+        return jsonify({
+            "ok": True,
+            "town_name": town_name,
+            "has_boundary": has_boundary,
+            "has_center": has_center,
+            "metadata_keys": list(metadata.keys()),
+            "sample_data": {
+                "town_name": metadata.get("town_name"),
+                "region": metadata.get("region"),
+                "center_lat": metadata.get("center_lat"),
+                "center_lng": metadata.get("center_lng"),
+                "boundary_type": metadata.get("boundary", {}).get("type") if has_boundary else None
+            }
+        })
+    except Exception as e:
+        return jsonify({
+            "ok": False,
+            "error": str(e)
+        }), 500
 
 
 # ==================== ERROR HANDLERS ====================
