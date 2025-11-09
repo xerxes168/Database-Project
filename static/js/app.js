@@ -6,6 +6,8 @@ const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 let trendChart = null;
 let hdbMap = null;
 let amenityMarkers = [];
+let compareTownMarkers = [];
+let townGeometries = {};
 
 // Amenity icon configurations
 const AMENITY_ICONS = {
@@ -45,6 +47,190 @@ function initMapbox() {
 function clearAmenityMarkers() {
   amenityMarkers.forEach(m => m.remove());
   amenityMarkers = [];
+}
+
+function clearCompareTownHighlights() {
+  if (!hdbMap) return;
+
+  // Remove compare markers
+  compareTownMarkers.forEach(m => {
+    if (m && typeof m.remove === "function") {
+      m.remove();
+    }
+  });
+  compareTownMarkers = [];
+
+  // Remove compare layers and sources if they exist
+  if (hdbMap.getLayer("compare-towns-fill")) {
+    hdbMap.removeLayer("compare-towns-fill");
+  }
+  if (hdbMap.getLayer("compare-towns-outline")) {
+    hdbMap.removeLayer("compare-towns-outline");
+  }
+  if (hdbMap.getSource("compare-towns-source")) {
+    hdbMap.removeSource("compare-towns-source");
+  }
+}
+
+function highlightComparedTownsOnMap(comparison) {
+  if (!hdbMap || !Array.isArray(comparison) || comparison.length === 0) return;
+
+  // Clear any existing markers/layers for town comparison
+  clearCompareTownHighlights();
+
+  const features = [];
+  let bounds = null;
+
+  // Helper: expand bounds using all coordinates from a Polygon / MultiPolygon
+  const extendBoundsFromGeometry = (geometry) => {
+    if (!geometry || !geometry.type || !geometry.coordinates) return;
+
+    const extendCoord = (coord) => {
+      if (!coord || coord.length < 2) return;
+      const lng = coord[0];
+      const lat = coord[1];
+      if (typeof lng !== "number" || typeof lat !== "number") return;
+      if (!bounds) {
+        bounds = new mapboxgl.LngLatBounds([lng, lat], [lng, lat]);
+      } else {
+        bounds.extend([lng, lat]);
+      }
+    };
+
+    if (geometry.type === "Polygon") {
+      (geometry.coordinates || []).forEach((ring) => {
+        (ring || []).forEach(extendCoord);
+      });
+    } else if (geometry.type === "MultiPolygon") {
+      (geometry.coordinates || []).forEach((poly) => {
+        (poly || []).forEach((ring) => {
+          (ring || []).forEach(extendCoord);
+        });
+      });
+    }
+  };
+
+  comparison.forEach((town) => {
+    if (!town) return;
+
+    const townName = (town.town || "").toUpperCase().trim();
+
+    // 1) Get exact town geometry from preloaded townGeometries
+    let geomSource = null;
+    if (townName && townGeometries && townGeometries[townName]) {
+      geomSource = townGeometries[townName];
+    }
+
+    if (geomSource) {
+      // Case A: FeatureCollection per town (as built in bootstrap)
+      if (geomSource.type === "FeatureCollection" && Array.isArray(geomSource.features)) {
+        geomSource.features.forEach((f) => {
+          if (!f || !f.geometry) return;
+
+          // Clone feature so we do not mutate original object
+          const feat = {
+            type: "Feature",
+            geometry: f.geometry,
+            properties: {
+              ...(f.properties || {}),
+              town: townName
+            }
+          };
+          features.push(feat);
+          extendBoundsFromGeometry(f.geometry);
+        });
+      }
+      // Case B: single Geometry object
+      else if (geomSource.type === "Polygon" || geomSource.type === "MultiPolygon") {
+        const feat = {
+          type: "Feature",
+          geometry: geomSource,
+          properties: {
+            town: townName
+          }
+        };
+        features.push(feat);
+        extendBoundsFromGeometry(geomSource);
+      }
+    }
+
+    // 2) Always add a marker at the town centre if we have one (for visual focus + popup)
+    const centerLat = typeof town.center_lat === "number" ? town.center_lat : null;
+    const centerLng = typeof town.center_lng === "number" ? town.center_lng : null;
+    if (centerLat !== null && centerLng !== null) {
+      const markerEl = document.createElement("div");
+      markerEl.className = "compare-town-marker";
+      markerEl.style.width = "14px";
+      markerEl.style.height = "14px";
+      markerEl.style.borderRadius = "9999px";
+      markerEl.style.border = "2px solid #22c55e";
+      markerEl.style.backgroundColor = "rgba(34, 197, 94, 0.2)";
+
+      const popup = new mapboxgl.Popup({ offset: 12 }).setHTML(`
+        <div style="font-size: 12px; font-weight: 600; color: #166534;">
+          ${town.town || townName || "Selected town"}
+        </div>
+      `);
+
+      const marker = new mapboxgl.Marker(markerEl)
+        .setLngLat([centerLng, centerLat])
+        .setPopup(popup)
+        .addTo(hdbMap);
+
+      compareTownMarkers.push(marker);
+
+      // If we did not get any polygon geometry for this town, at least extend bounds with the centre
+      if (!geomSource) {
+        if (!bounds) {
+          bounds = new mapboxgl.LngLatBounds([centerLng, centerLat], [centerLng, centerLat]);
+        } else {
+          bounds.extend([centerLng, centerLat]);
+        }
+      }
+    }
+  });
+
+  // Add the GeoJSON source + fill + outline layers if we have any polygon features
+  if (features.length > 0) {
+    hdbMap.addSource("compare-towns-source", {
+      type: "geojson",
+      data: {
+        type: "FeatureCollection",
+        features: features
+      }
+    });
+
+    // Fill the town polygons with a semi-transparent green highlight
+    hdbMap.addLayer({
+      id: "compare-towns-fill",
+      type: "fill",
+      source: "compare-towns-source",
+      paint: {
+        "fill-color": "#22c55e",
+        "fill-opacity": 0.18
+      }
+    });
+
+    // Draw a darker green outline around the highlighted towns
+    hdbMap.addLayer({
+      id: "compare-towns-outline",
+      type: "line",
+      source: "compare-towns-source",
+      paint: {
+        "line-color": "#15803d",
+        "line-width": 2
+      }
+    });
+  }
+
+  // Finally, fit the map view to all collected bounds (polygons and/or centres)
+  if (bounds) {
+    hdbMap.fitBounds(bounds, {
+      padding: { top: 40, bottom: 40, left: 360, right: 40 },
+      maxZoom: 13,
+      duration: 800
+    });
+  }
 }
 
 function getAmenityConfig(amenityType) {
@@ -593,6 +779,9 @@ async function setupComparePanel() {
             </div>
           </div>
         `).join("");
+
+        // Highlight compared towns on the map using geometry/center from API
+        highlightComparedTownsOnMap(res.comparison);
       } else {
         results.innerHTML = `<p class="col-span-3 text-center text-zinc-600 py-8">No comparison data available</p>`;
       }
@@ -739,6 +928,68 @@ async function bootstrap() {
   
   try {
     const meta = await getJSON("/api/meta");
+
+    // Load static town geometries for exact map highlighting (fallback if API does not send geometry)
+    try {
+      const rawTownGeoms = await getJSON("/static/data/town_geometries.json");
+
+      // Support both a pre-keyed { [townName]: geometry } map,
+      // and a raw URA-style FeatureCollection where each feature has
+      // the town name embedded in the Description HTML.
+      if (rawTownGeoms &&
+          !Array.isArray(rawTownGeoms) &&
+          rawTownGeoms.type === "FeatureCollection" &&
+          Array.isArray(rawTownGeoms.features)) {
+        const byName = {};
+
+        rawTownGeoms.features.forEach((f) => {
+          if (!f || !f.geometry) return;
+          const props = f.properties || {};
+
+          // Try a few common property names first
+          let name = props.town || props.TOWN || props.PLT_AREA_N || props.PLAN_AREA_N || null;
+
+          // If town name is embedded in Description HTML (URA export), extract PLN_AREA_N
+          // Example snippet: PLN_AREA_N</th> <td>BEDOK</td>
+          if (!name && typeof props.Description === "string") {
+            const match = props.Description.match(/PLN_AREA_N[\s\S]*?<td>(.*?)<\/td>/i);
+            if (match && match[1]) {
+              name = match[1].trim();
+            }
+          }
+
+          if (!name) return;
+
+          const key = name.toUpperCase();
+
+          if (!byName[key]) {
+            byName[key] = {
+              type: "FeatureCollection",
+              features: [],
+            };
+          }
+
+          byName[key].features.push({
+            type: "Feature",
+            geometry: f.geometry,
+            properties: {
+              ...(f.properties || {}),
+              town: name,
+            },
+          });
+        });
+
+        townGeometries = byName;
+      } else {
+        // Assume it's already a { [townName]: geometry } map
+        townGeometries = rawTownGeoms || {};
+      }
+
+      console.log("Loaded town geometries for towns:", Object.keys(townGeometries || {}));
+    } catch (geoErr) {
+      console.warn("Could not load /static/data/town_geometries.json; town highlighting will use centers only.", geoErr);
+      townGeometries = {};
+    }
     
     // Populate town selects
     const townSelects = ["#sel-town", "#trans-town", "#amenity-town", "#comp-town1", "#comp-town2", "#comp-town3", "#listing-town-filter"];

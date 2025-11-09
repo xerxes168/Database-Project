@@ -171,6 +171,18 @@ def api_compare_towns():
                     town_data["maturity"] = metadata.get("maturity", "Unknown")
                     town_data["characteristics"] = metadata.get("characteristics", [])
                     town_data["description"] = metadata.get("description", "")
+                    # Optional geometry/center data for map highlighting
+                    center = metadata.get("center") or metadata.get("centroid")
+                    if isinstance(center, dict):
+                        town_data["center_lat"] = center.get("lat") or center.get("latitude")
+                        town_data["center_lng"] = center.get("lng") or center.get("longitude")
+                    elif isinstance(center, (list, tuple)) and len(center) == 2:
+                        # Assume [lng, lat] ordering
+                        town_data["center_lat"], town_data["center_lng"] = center[1], center[0]
+
+                    geometry = metadata.get("geometry") or metadata.get("boundary")
+                    if geometry:
+                        town_data["geometry"] = geometry
                 else:
                     town_data["region"] = "Unknown"
                     town_data["maturity"] = "Unknown"
@@ -587,5 +599,5 @@ def server_error(e):
 
 if __name__ == "__main__":
     print("🚀 Starting HDB HomeFinder DB...")
-    print(f"📍 Server running on http://0.0.0.0:5000")
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    print(f"📍 Server running on http://0.0.0.0:3000")
+    app.run(debug=True, host="0.0.0.0", port=3000)
