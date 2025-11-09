@@ -159,9 +159,6 @@ def api_compare_towns():
         # Get SQL comparison data
         comparison = query_town_comparison(towns_list, flat_type)
         
-        # Collect town metadata for map visualization
-        town_metadata_list = []
-        
         # Enrich with MongoDB town metadata
         for town_data in comparison:
             town_name = town_data["town"]
@@ -209,8 +206,7 @@ def api_compare_towns():
         
         return jsonify({
             "ok": True, 
-            "comparison": comparison,
-            "town_metadata": town_metadata_list
+            "comparison": comparison
         })
     except Exception as e:
         print(f"Error in /api/compare/towns: {e}")
@@ -646,5 +642,5 @@ def server_error(e):
 
 if __name__ == "__main__":
     print("🚀 Starting HDB HomeFinder DB...")
-    print(f"📍 Server running on http://0.0.0.0:3000")
-    app.run(debug=True, host="0.0.0.0", port=3000)
+    print(f"📍 Server running on http://0.0.0.0:5000")
+    app.run(debug=True, host="0.0.0.0", port=5000)
