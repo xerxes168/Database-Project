@@ -6,6 +6,8 @@ const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 let trendChart = null;
 let hdbMap = null;
 let amenityMarkers = [];
+let townPolygons = [];
+let listingMarkers = [];
 
 // Amenity icon configurations
 const AMENITY_ICONS = {
@@ -45,6 +47,26 @@ function initMapbox() {
 function clearAmenityMarkers() {
   amenityMarkers.forEach(m => m.remove());
   amenityMarkers = [];
+}
+
+function clearTownPolygons() {
+  townPolygons.forEach(layerId => {
+    if (hdbMap.getLayer(layerId)) {
+      hdbMap.removeLayer(layerId);
+    }
+    if (hdbMap.getLayer(`${layerId}-outline`)) {
+      hdbMap.removeLayer(`${layerId}-outline`);
+    }
+    if (hdbMap.getSource(layerId)) {
+      hdbMap.removeSource(layerId);
+    }
+  });
+  townPolygons = [];
+}
+
+function clearListingMarkers() {
+  listingMarkers.forEach(m => m.remove());
+  listingMarkers = [];
 }
 
 function getAmenityConfig(amenityType) {
@@ -111,6 +133,178 @@ function showAmenitiesOnMap(geojson) {
 
   // Update stats display
   updateAmenityStats(amenityCount);
+}
+
+function showTownBoundariesOnMap(towns) {
+  if (!hdbMap || !towns || towns.length === 0) {
+    console.warn('Cannot show town boundaries:', { hdbMap, towns });
+    return;
+  }
+
+  console.log('Showing town boundaries for:', towns);
+
+  clearTownPolygons();
+  clearAmenityMarkers();
+  clearListingMarkers();
+
+  const bounds = new mapboxgl.LngLatBounds();
+  const colors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'];
+
+  // Ensure map is fully loaded before adding sources
+  const addBoundaries = () => {
+    towns.forEach((town, index) => {
+      if (!town.boundary || !town.boundary.coordinates) {
+        console.warn('Town missing boundary:', town.town_name);
+        return;
+      }
+
+      const sourceId = `town-${town.town_name.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}-${index}`;
+      const layerId = sourceId;
+      const outlineId = `${layerId}-outline`;
+
+      try {
+        // Add source
+        hdbMap.addSource(sourceId, {
+          type: 'geojson',
+          data: {
+            type: 'Feature',
+            geometry: town.boundary,
+            properties: {
+              name: town.town_name,
+              region: town.region || 'Unknown',
+              maturity: town.maturity || 'Unknown'
+            }
+          }
+        });
+
+        // Add fill layer
+        hdbMap.addLayer({
+          id: layerId,
+          type: 'fill',
+          source: sourceId,
+          paint: {
+            'fill-color': colors[index % colors.length],
+            'fill-opacity': 0.3
+          }
+        });
+
+        // Add outline layer
+        hdbMap.addLayer({
+          id: outlineId,
+          type: 'line',
+          source: sourceId,
+          paint: {
+            'line-color': colors[index % colors.length],
+            'line-width': 3
+          }
+        });
+
+        townPolygons.push(layerId);
+
+        console.log(`Added town boundary for ${town.town_name}`);
+
+        // Add marker at center
+        if (town.center_lat && town.center_lng) {
+          const el = document.createElement('div');
+          el.className = 'town-marker';
+          el.innerHTML = `<div style="background: white; padding: 8px 16px; border-radius: 8px; border: 2px solid ${colors[index % colors.length]}; font-weight: bold; font-size: 13px; color: #18181b; box-shadow: 0 2px 8px rgba(0,0,0,0.2); white-space: nowrap;">${town.town_name}</div>`;
+
+          const marker = new mapboxgl.Marker(el)
+            .setLngLat([town.center_lng, town.center_lat])
+            .addTo(hdbMap);
+
+          listingMarkers.push(marker); // Store for cleanup
+        }
+
+        // Extend bounds
+        if (town.boundary.coordinates && town.boundary.coordinates[0]) {
+          town.boundary.coordinates[0].forEach(coord => {
+            bounds.extend(coord);
+          });
+        }
+      } catch (error) {
+        console.error(`Error adding boundary for ${town.town_name}:`, error);
+      }
+    });
+
+    if (!bounds.isEmpty()) {
+      setTimeout(() => {
+        hdbMap.fitBounds(bounds, { padding: 50, maxZoom: 12, duration: 1000 });
+      }, 100);
+    }
+  };
+
+  // Check if map is loaded
+  if (hdbMap.loaded()) {
+    addBoundaries();
+  } else {
+    hdbMap.once('load', addBoundaries);
+  }
+}
+
+function showListingsOnMap(listings) {
+  if (!hdbMap || !listings || listings.length === 0) return;
+
+  clearListingMarkers();
+  clearAmenityMarkers();
+  clearTownPolygons();
+
+  const bounds = new mapboxgl.LngLatBounds();
+
+  listings.forEach((listing) => {
+    if (!listing.latitude || !listing.longitude) return;
+
+    const lng = parseFloat(listing.longitude);
+    const lat = parseFloat(listing.latitude);
+
+    // Create custom marker
+    const el = document.createElement('div');
+    el.className = 'listing-marker';
+    el.innerHTML = `
+      <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #10b981, #059669); border: 3px solid white; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.3); cursor: pointer;">
+        <svg style="width: 18px; height: 18px; color: white;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h4m4 0h4a1 1 0 001-1V10" />
+        </svg>
+      </div>
+    `;
+
+    // Create popup
+    const remarksPreview = listing.remarks && listing.remarks.length > 150 
+      ? listing.remarks.substring(0, 150) + '...' 
+      : listing.remarks || 'No description';
+
+    const popupHtml = `
+      <div style="min-width: 280px; max-width: 320px;">
+        <div style="font-weight: 700; margin-bottom: 8px; color: #18181b; font-size: 15px;">
+          🏠 Block ${listing.block}, ${listing.street}
+        </div>
+        <div style="font-size: 12px; color: #52525b; margin-bottom: 8px;">
+          <span style="font-weight: 600; color: #059669;">${listing.town}</span> • ${listing.flat_type}
+        </div>
+        <div style="font-size: 12px; color: #3f3f46; line-height: 1.5; margin-bottom: 8px;">
+          ${remarksPreview}
+        </div>
+        <div style="font-size: 11px; color: #71717a; border-top: 1px solid #e5e7eb; padding-top: 6px; margin-top: 6px;">
+          📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}
+        </div>
+      </div>
+    `;
+
+    const popup = new mapboxgl.Popup({ offset: 25, maxWidth: '320px' })
+      .setHTML(popupHtml);
+
+    const marker = new mapboxgl.Marker(el)
+      .setLngLat([lng, lat])
+      .setPopup(popup)
+      .addTo(hdbMap);
+
+    listingMarkers.push(marker);
+    bounds.extend([lng, lat]);
+  });
+
+  if (!bounds.isEmpty()) {
+    hdbMap.fitBounds(bounds, { padding: 50, maxZoom: 14 });
+  }
 }
 
 function updateAmenityStats(count) {
@@ -635,6 +829,11 @@ async function setupListingsPanel() {
       if (res.ok && res.results) {
         if (countDiv) countDiv.textContent = `${res.count} results`;
         
+        // Show listings on map
+        if (res.results.length > 0) {
+          showListingsOnMap(res.results);
+        }
+        
         if (res.count === 0) {
           if (resultsDiv) resultsDiv.innerHTML = `<p class="text-center text-zinc-600 py-8">No listings found matching "${query}"</p>`;
         } else {
@@ -646,10 +845,10 @@ async function setupListingsPanel() {
               }
               
               return `
-                <div class="p-4 bg-white rounded-lg border border-zinc-300 hover:border-emerald-500 transition">
+                <div class="p-4 bg-white rounded-lg border border-zinc-300 hover:border-emerald-500 transition cursor-pointer listing-card" data-lat="${listing.latitude}" data-lng="${listing.longitude}">
                   <div class="flex items-start justify-between mb-2">
                     <div class="flex-1">
-                      <div class="font-semibold text-zinc-900">Block ${listing.block}, ${listing.street}</div>
+                      <div class="font-semibold text-zinc-900">🏠 Block ${listing.block}, ${listing.street}</div>
                       <div class="text-xs text-zinc-600 mt-1">${listing.town} • ${listing.flat_type}</div>
                     </div>
                     ${listing.score ? `
@@ -659,12 +858,31 @@ async function setupListingsPanel() {
                     ` : ''}
                   </div>
                   <p class="text-sm text-zinc-700 leading-relaxed">${remarksPreview}</p>
-                  <div class="mt-2 text-xs text-zinc-500">
-                    Posted: ${new Date(listing.created_date).toLocaleDateString()}
+                  <div class="mt-2 text-xs text-zinc-500 flex items-center justify-between">
+                    <span>Posted: ${new Date(listing.created_date).toLocaleDateString()}</span>
+                    ${listing.latitude && listing.longitude ? `
+                      <span class="text-emerald-600 font-medium">📍 Click to view on map</span>
+                    ` : ''}
                   </div>
                 </div>
               `;
             }).join('');
+            
+            // Add click handlers to zoom to specific listing
+            resultsDiv.querySelectorAll('.listing-card').forEach((card, index) => {
+              card.addEventListener('click', () => {
+                const lat = parseFloat(card.dataset.lat);
+                const lng = parseFloat(card.dataset.lng);
+                if (lat && lng && hdbMap && listingMarkers[index]) {
+                  hdbMap.flyTo({
+                    center: [lng, lat],
+                    zoom: 16,
+                    duration: 1500
+                  });
+                  listingMarkers[index].togglePopup();
+                }
+              });
+            });
           }
         }
       } else {
