@@ -9,7 +9,10 @@ from pymongo import MongoClient
 from db_mysql import (
     get_towns, get_flat_types, get_months,
     query_trends, query_transactions, query_town_comparison,
-    get_total_transaction_count
+    get_total_transaction_count, get_flat_type_specs,
+    get_current_mortgage_rate, get_current_loan_rules,
+    get_latest_household_income, get_household_expenditure_latest,
+    calculate_affordability_enhanced, get_market_statistics
 )
 from db_mongo import (
     # Amenities
@@ -66,13 +69,19 @@ def api_meta():
         flat_types = get_flat_types()
         months = get_months()
         total_transactions = get_total_transaction_count()
+        mortgage_rate = get_current_mortgage_rate()
+        loan_rules = get_current_loan_rules()
+        market_stats = get_market_statistics()
         
         return jsonify({
             "towns": towns,
             "flat_types": flat_types,
             "months": months,
             "total_transactions": total_transactions,
-            "amenity_types": ["MRT_STATION", "SCHOOL", "CLINIC", "SUPERMARKET", "PARK"]
+            "amenity_types": ["MRT_STATION", "SCHOOL", "CLINIC", "SUPERMARKET", "PARK"],
+            "current_mortgage_rate": mortgage_rate,
+            "current_loan_rules": loan_rules,
+            "market_statistics": market_stats
         })
     except Exception as e:
         print(f"Error in /api/meta: {e}")
@@ -159,6 +168,9 @@ def api_compare_towns():
     try:
         # Get SQL comparison data
         comparison = query_town_comparison(towns_list, flat_type)
+
+        # Get income data for affordability context
+        income_data = get_latest_household_income()
         
         # Enrich with MongoDB town metadata (homefinder.town_metadata)
         for town_data in comparison:
@@ -194,10 +206,21 @@ def api_compare_towns():
                 town_data["maturity"] = "Unknown"
                 town_data["characteristics"] = []
             
-            # Calculate affordability score
+            # Calculate affordability score based on income
             median_psm = town_data.get('median_psm', 0)
-            if median_psm > 0:
-                town_data['affordability_score'] = round(max(1, min(10, 10 - (median_psm - 5000) / 500)), 1)
+            avg_price = town_data.get('avg_price', 0)
+
+            if median_psm > 0 and income_data and income_data.get('resident_median'):
+                # Convert to float to avoid Decimal type issues
+                monthly_income = float(income_data['resident_median'])
+                median_psm_float = float(median_psm)
+                
+                # Assume 90sqm flat
+                estimated_flat_price = median_psm_float * 90
+                
+                # Affordability = income / (price/300) ratio, scaled to 10
+                affordability_ratio = (monthly_income * 300) / estimated_flat_price if estimated_flat_price > 0 else 0
+                town_data['affordability_score'] = round(min(10, max(1, affordability_ratio * 3)), 1)
             else:
                 town_data['affordability_score'] = 5.0
             
@@ -217,44 +240,74 @@ def api_compare_towns():
 # ==================== AFFORDABILITY ====================
 @app.route("/api/affordability", methods=["POST"])
 def api_affordability():
-    """Calculate affordability with mortgage rules."""
+    """Calculate affordability with enhanced mortgage rules and rates"""
     payload = request.get_json() or {}
     
     try:
         income = float(payload.get("income", 0))
         expenses = float(payload.get("expenses", 0))
-        interest_rate = float(payload.get("interest", 2.6))
-        tenure_years = int(payload.get("tenure_years", 25))
-        down_payment_pct = float(payload.get("down_payment_pct", 20))
+        loan_type = payload.get("loan_type", "hdb")  # "hdb" or "bank"
         
-        # Affordability calculation
-        max_monthly_payment = (income * 0.30) - (expenses * 0.30)
-        monthly_rate = (interest_rate / 100) / 12
-        num_payments = tenure_years * 12
+        # Use enhanced calculation from db_mysql
+        result = calculate_affordability_enhanced(
+            income=income,
+            expenses=expenses,
+            loan_type=loan_type,
+            use_current_rates=True
+        )
         
-        if monthly_rate > 0:
-            max_loan = max_monthly_payment * ((1 - (1 + monthly_rate) ** -num_payments) / monthly_rate)
-        else:
-            max_loan = max_monthly_payment * num_payments
+        # Get expenditure data for context
+        expenditure_data = get_household_expenditure_latest()
+        housing_expense = next((e for e in expenditure_data if "Housing" in e["category"]), None)
         
-        max_property_value = max_loan / (1 - down_payment_pct / 100)
-        avg_flat_size_sqm = 90
-        max_psm = max_property_value / avg_flat_size_sqm if max_property_value > 0 else 0
-        affordable = max_property_value >= 300000
+        # Add context
+        result["housing_expense_avg"] = housing_expense["amount"] if housing_expense else None
+        result["loan_type"] = loan_type
         
-        return jsonify({
-            "ok": True,
-            "affordable": affordable,
-            "max_property_value": round(max_property_value, 2),
-            "max_loan_amount": round(max_loan, 2),
-            "max_monthly_payment": round(max_monthly_payment, 2),
-            "max_psm": round(max_psm, 2),
-            "down_payment_required": round(max_property_value * down_payment_pct / 100, 2)
-        })
+        return jsonify(result)
     except Exception as e:
         print(f"Error in /api/affordability: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
+@app.route("/api/affordability/context", methods=["GET"])
+def api_affordability_context():
+    """Get context data for affordability calculator"""
+    try:
+        current_rate = get_current_mortgage_rate()
+        loan_rules = get_current_loan_rules()
+        income_data = get_latest_household_income()
+        expenditure_data = get_household_expenditure_latest()
+        
+        return jsonify({
+            "ok": True,
+            "current_rates": current_rate,
+            "loan_rules": loan_rules,
+            "income_data": income_data,
+            "expenditure_breakdown": expenditure_data[:10]
+        })
+    except Exception as e:
+        print(f"Error in /api/affordability/context: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/flat-specs", methods=["GET"])
+def api_flat_specs():
+    """Get flat type specifications"""
+    flat_type = request.args.get("flat_type")
+    
+    try:
+        if flat_type:
+            specs = get_flat_type_specs(flat_type)
+            if specs:
+                return jsonify({"ok": True, "specs": specs})
+            else:
+                return jsonify({"ok": False, "error": "Flat type not found"}), 404
+        else:
+            all_specs = get_flat_type_specs()
+            return jsonify({"ok": True, "specs": all_specs})
+    except Exception as e:
+        print(f"Error in /api/flat-specs: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 # ==================== AMENITIES (MongoDB GeoJSON) ====================
 @app.route("/api/amenities")
