@@ -153,13 +153,14 @@ def api_compare_towns():
     """Compare multiple towns with integrated data."""
     payload = request.get_json() or {}
     towns_list = payload.get("towns", [])
-    flat_type = payload.get("flat_type", "4 ROOM")
+    flat_type = payload.get("flat_type")
+
     
     try:
         # Get SQL comparison data
         comparison = query_town_comparison(towns_list, flat_type)
         
-        # Enrich with MongoDB town metadata
+        # Enrich with MongoDB town metadata (homefinder.town_metadata)
         for town_data in comparison:
             town_name = town_data["town"]
             
@@ -179,9 +180,9 @@ def api_compare_towns():
                     elif isinstance(center, (list, tuple)) and len(center) == 2:
                         # Assume [lng, lat] ordering
                         town_data["center_lat"], town_data["center_lng"] = center[1], center[0]
-
                     geometry = metadata.get("geometry") or metadata.get("boundary")
-                    if geometry:
+                    # Only attach if geometry looks like a GeoJSON object
+                    if isinstance(geometry, dict) and "type" in geometry:
                         town_data["geometry"] = geometry
                 else:
                     town_data["region"] = "Unknown"
@@ -606,20 +607,31 @@ def api_debug_town_metadata():
         
         # Check required fields
         has_boundary = "boundary" in metadata
+        has_geometry = "geometry" in metadata
         has_center = "center_lat" in metadata and "center_lng" in metadata
         
         return jsonify({
             "ok": True,
             "town_name": town_name,
             "has_boundary": has_boundary,
+            "has_geometry": has_geometry,
             "has_center": has_center,
             "metadata_keys": list(metadata.keys()),
             "sample_data": {
-                "town_name": metadata.get("town_name"),
+                "town": metadata.get("town"),
                 "region": metadata.get("region"),
                 "center_lat": metadata.get("center_lat"),
                 "center_lng": metadata.get("center_lng"),
-                "boundary_type": metadata.get("boundary", {}).get("type") if has_boundary else None
+                "boundary_type": (
+                    metadata.get("boundary", {}).get("type")
+                    if has_boundary and isinstance(metadata.get("boundary"), dict)
+                    else None
+                ),
+                "geometry_type": (
+                    metadata.get("geometry", {}).get("type")
+                    if has_geometry and isinstance(metadata.get("geometry"), dict)
+                    else None
+                )
             }
         })
     except Exception as e:

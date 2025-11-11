@@ -255,7 +255,11 @@ def search_listing_remarks(query: str, town: Optional[str] = None,
     cursor = db.listing_remarks.find(
         search_filter,
         {"score": {"$meta": "textScore"}}
-    ).sort([("score", {"$meta": "textScore"})]).limit(limit)
+    ).sort([
+        ("score", {"$meta": "textScore"}),
+        ("created_date", DESCENDING),
+        ("_id", ASCENDING),
+    ]).limit(limit)
     
     results = []
     for doc in cursor:

@@ -10,6 +10,8 @@ let townPolygons = [];
 let listingMarkers = [];
 let compareTownMarkers = [];
 let townGeometries = {};
+let amenitiesData = null;
+let currentListingPopup = null;
 
 // Amenity icon configurations
 const AMENITY_ICONS = {
@@ -69,6 +71,10 @@ function clearTownPolygons() {
 function clearListingMarkers() {
   listingMarkers.forEach(m => m.remove());
   listingMarkers = [];
+  if (currentListingPopup) {
+    currentListingPopup.remove();
+    currentListingPopup = null;
+  }
 }
 
 function clearCompareTownHighlights() {
@@ -97,6 +103,125 @@ function clearCompareTownHighlights() {
 function getAmenityConfig(amenityType) {
   const type = amenityType ? amenityType.toUpperCase() : 'DEFAULT';
   return AMENITY_ICONS[type] || AMENITY_ICONS['DEFAULT'];
+}
+function getPriceRange(price) {
+  const numericPrice = typeof price === 'number' ? price : parseFloat(price || '0');
+  if (!numericPrice || Number.isNaN(numericPrice)) {
+    return null;
+  }
+  const min = Math.round(numericPrice * 0.95 / 1000) * 1000;
+  const max = Math.round(numericPrice * 1.05 / 1000) * 1000;
+  return {
+    min,
+    max,
+    label: `$${min.toLocaleString()} – $${max.toLocaleString()}`
+  };
+}
+
+function distanceInMeters(lat1, lng1, lat2, lng2) {
+  const R = 6371000; // earth radius in meters
+  const toRad = (d) => (d * Math.PI) / 180;
+
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function getNearbyAmenities(lat, lng, radiusMeters = 600) {
+  if (!amenitiesData || !amenitiesData.features) return [];
+
+  return amenitiesData.features.filter((f) => {
+    if (!f || !f.geometry || f.geometry.type !== 'Point') return false;
+    const coords = f.geometry.coordinates || [];
+    if (!Array.isArray(coords) || coords.length < 2) return false;
+    const [fLng, fLat] = coords;
+    const dist = distanceInMeters(lat, lng, fLat, fLng);
+    return dist <= radiusMeters;
+  });
+}
+
+function showNearbyAmenitiesOnMap(lat, lng, radiusMeters = 600) {
+  if (!hdbMap) return [];
+
+  const nearby = getNearbyAmenities(lat, lng, radiusMeters);
+  clearAmenityMarkers();
+
+  if (!nearby.length) {
+    return [];
+  }
+
+  const drawable = [];
+  const coordCounts = {};
+
+  nearby.forEach((feature) => {
+    const geom = feature.geometry;
+    const props = feature.properties || {};
+    if (!geom || geom.type !== "Point" || !Array.isArray(geom.coordinates)) return;
+
+    let [fLng, fLat] = geom.coordinates;
+
+    // Track how many amenities share this exact coordinate (rounded to 6dp)
+    const key = `${fLng.toFixed(6)},${fLat.toFixed(6)}`;
+    coordCounts[key] = (coordCounts[key] || 0) + 1;
+    const indexAtCoord = coordCounts[key];
+
+    // If multiple amenities share the same spot, jitter them slightly
+    if (indexAtCoord > 1) {
+      const offsetMeters = 18; // ~18m radius circle
+      const angle = (indexAtCoord - 1) * (Math.PI / 3); // 6 positions around the circle
+
+      // Rough meter-to-degree conversion
+      const metersPerDegLat = 111320;
+      const metersPerDegLng = 111320 * Math.cos((fLat * Math.PI) / 180);
+
+      const dLat = (offsetMeters * Math.sin(angle)) / metersPerDegLat;
+      const dLng = (offsetMeters * Math.cos(angle)) / metersPerDegLng;
+
+      fLat = fLat + dLat;
+      fLng = fLng + dLng;
+    }
+
+    const amenityType = props.CLASS || props.amenity_type || "DEFAULT";
+    const config = getAmenityConfig(amenityType);
+    const name = props.NAME || props.name || "Unnamed amenity";
+
+    const el = document.createElement("div");
+    el.className = "amenity-marker-custom";
+    el.style.backgroundColor = config.color;
+    el.innerHTML = `<span class="amenity-icon">${config.icon}</span>`;
+
+    const popupHtml = `
+      <div style="min-width: 220px;">
+        <div style="font-weight: 600; margin-bottom: 6px; color: #18181b; font-size: 14px;">
+          ${config.icon} ${name}
+        </div>
+        <div style="font-size: 12px; color: #52525b; margin-bottom: 4px;">
+          Type: <span style="font-weight: 600; color: ${config.color};">${config.label}</span>
+        </div>
+        <div style="font-size: 11px; color: #71717a;">
+          ${geom.coordinates[0].toFixed(5)}, ${geom.coordinates[1].toFixed(5)}
+        </div>
+      </div>
+    `;
+
+    const popup = new mapboxgl.Popup({ offset: 16 }).setHTML(popupHtml);
+
+    const marker = new mapboxgl.Marker(el)
+      .setLngLat([fLng, fLat])
+      .setPopup(popup)
+      .addTo(hdbMap);
+
+    amenityMarkers.push(marker);
+    drawable.push(feature);
+  });
+
+  return drawable;
 }
 
 function showAmenitiesOnMap(geojson) {
@@ -310,9 +435,13 @@ function highlightComparedTownsOnMap(comparison) {
 
     const townName = (town.town || "").toUpperCase().trim();
 
-    // 1) Get exact town geometry from preloaded townGeometries
     let geomSource = null;
-    if (townName && townGeometries && townGeometries[townName]) {
+    if (town.boundary) {
+      geomSource = town.boundary;
+    } else if (town.geometry) {
+      geomSource = town.geometry;
+    } else if (townName && townGeometries && townGeometries[townName]) {
+      // Fallback to static JSON geometry
       geomSource = townGeometries[townName];
     }
 
@@ -443,9 +572,15 @@ function showListingsOnMap(listings) {
     const lng = parseFloat(listing.longitude);
     const lat = parseFloat(listing.latitude);
 
+    // Compute price and approximate range if available
+    const price = typeof listing.price === "number"
+      ? listing.price
+      : (listing.price ? parseFloat(listing.price) : null);
+    const priceRange = getPriceRange(price);
+
     // Create custom marker
-    const el = document.createElement('div');
-    el.className = 'listing-marker';
+    const el = document.createElement("div");
+    el.className = "listing-marker";
     el.innerHTML = `
       <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #10b981, #059669); border: 3px solid white; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.3); cursor: pointer;">
         <svg style="width: 18px; height: 18px; color: white;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -454,38 +589,100 @@ function showListingsOnMap(listings) {
       </div>
     `;
 
-    // Create popup
-    const remarksPreview = listing.remarks && listing.remarks.length > 150 
-      ? listing.remarks.substring(0, 150) + '...' 
-      : listing.remarks || 'No description';
-
-    const popupHtml = `
-      <div style="min-width: 280px; max-width: 320px;">
-        <div style="font-weight: 700; margin-bottom: 8px; color: #18181b; font-size: 15px;">
-          🏠 Block ${listing.block}, ${listing.street}
-        </div>
-        <div style="font-size: 12px; color: #52525b; margin-bottom: 8px;">
-          <span style="font-weight: 600; color: #059669;">${listing.town}</span> • ${listing.flat_type}
-        </div>
-        <div style="font-size: 12px; color: #3f3f46; line-height: 1.5; margin-bottom: 8px;">
-          ${remarksPreview}
-        </div>
-        <div style="font-size: 11px; color: #71717a; border-top: 1px solid #e5e7eb; padding-top: 6px; margin-top: 6px;">
-          📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}
-        </div>
-      </div>
-    `;
-
-    const popup = new mapboxgl.Popup({ offset: 25, maxWidth: '320px' })
-      .setHTML(popupHtml);
+    const remarksPreview = listing.remarks && listing.remarks.length > 150
+      ? listing.remarks.substring(0, 150) + "..."
+      : listing.remarks || "No description";
 
     const marker = new mapboxgl.Marker(el)
       .setLngLat([lng, lat])
-      .setPopup(popup)
       .addTo(hdbMap);
 
     listingMarkers.push(marker);
     bounds.extend([lng, lat]);
+
+    // When clicking the house icon marker, show price + nearby amenities
+    el.addEventListener("click", (evt) => {
+      evt.stopPropagation();
+      if (!hdbMap) return;
+
+      // Close any previously open listing popup so only one is visible
+      if (currentListingPopup) {
+        currentListingPopup.remove();
+        currentListingPopup = null;
+      }
+
+      // Compute and show nearby amenities around this listing (~600m)
+      const nearby = showNearbyAmenitiesOnMap(lat, lng, 600) || [];
+
+      const amenitiesHtml = nearby.length === 0
+        ? '<p style="font-size:11px; color:#9ca3af; margin-top:2px;">No amenities found within ~600m.</p>'
+        : `
+          <ul style="margin:4px 0 0; padding-left:16px; max-height:120px; overflow-y:auto;">
+            ${nearby.map((f) => {
+              const props = f.properties || {};
+              const name = props.NAME || props.name || "Amenity";
+              const klass = props.CLASS || props.amenity_type || "";
+              return `<li style="font-size:11px; color:#4b5563; margin-bottom:2px;">• ${name}${klass ? ` <span style="color:#9ca3af;">(${klass})</span>` : ""}</li>`;
+            }).join("")}
+          </ul>
+        `;
+
+      const popupHtml = `
+        <div style="min-width: 280px; max-width: 320px;">
+          <div style="font-weight: 700; margin-bottom: 4px; color: #18181b; font-size: 15px;">
+            🏠 Block ${listing.block}, ${listing.street}
+          </div>
+          <div style="font-size: 12px; color: #52525b; margin-bottom: 4px;">
+            <span style="font-weight: 600; color: #059669;">${listing.town}</span> • ${listing.flat_type}
+          </div>
+          ${price ? `
+          <div style="font-size: 13px; color: #16a34a; font-weight: 700; margin-bottom: 4px;">
+            Price: $${price.toLocaleString()}
+          </div>
+          ${priceRange ? `<div style="font-size: 11px; color: #4b5563; margin-bottom: 8px;">
+            Approx. recent range: <span style="font-weight:600;">${priceRange.label}</span>
+          </div>` : ""}
+          ` : ""}
+          <div style="font-size: 12px; color: #3f3f46; line-height: 1.5; margin-bottom: 8px;">
+            ${remarksPreview}
+          </div>
+          <div style="font-size: 11px; color: #71717a; border-top: 1px solid #e5e7eb; padding-top: 6px; margin-top: 6px;">
+            📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}
+          </div>
+          <div style="font-size: 11px; color: #6b7280; margin-top: 4px;">
+            Nearby amenities (~600m):
+            ${amenitiesHtml}
+          </div>
+        </div>
+      `;
+
+      const popup = new mapboxgl.Popup({ offset: 25, maxWidth: "320px" });
+
+      // Ensure only one listing popup is open at any time
+      popup.on("open", () => {
+        if (currentListingPopup && currentListingPopup !== popup) {
+          currentListingPopup.remove();
+        }
+        currentListingPopup = popup;
+      });
+
+      popup.on("close", () => {
+        if (currentListingPopup === popup) {
+          currentListingPopup = null;
+        }
+      });
+
+      popup.setHTML(popupHtml);
+
+      hdbMap.flyTo({
+        center: [lng, lat],
+        zoom: 16,
+        duration: 1500
+      });
+
+      marker.setPopup(popup);
+      marker.togglePopup();
+    });
   });
 
   if (!bounds.isEmpty()) {
@@ -1034,7 +1231,15 @@ async function setupListingsPanel() {
               }
               
               return `
-                <div class="p-4 bg-white rounded-lg border border-zinc-300 hover:border-emerald-500 transition cursor-pointer listing-card" data-lat="${listing.latitude}" data-lng="${listing.longitude}">
+                <div class="p-4 bg-white rounded-lg border border-zinc-300 hover:border-emerald-500 transition cursor-pointer listing-card"
+                      data-lat="${listing.latitude}"
+                      data-lng="${listing.longitude}"
+                      data-town="${listing.town}"
+                      data-flat-type="${listing.flat_type}"
+                      data-block="${listing.block}"
+                      data-street="${listing.street}"
+                      data-price="${listing.price || ''}"
+                      data-remarks="${(remarksPreview || '').replace(/"/g, '&quot;')}">
                   <div class="flex items-start justify-between mb-2">
                     <div class="flex-1">
                       <div class="font-semibold text-zinc-900">🏠 Block ${listing.block}, ${listing.street}</div>
@@ -1059,16 +1264,100 @@ async function setupListingsPanel() {
             
             // Add click handlers to zoom to specific listing
             resultsDiv.querySelectorAll('.listing-card').forEach((card, index) => {
+              card.dataset.index = index;
+
               card.addEventListener('click', () => {
                 const lat = parseFloat(card.dataset.lat);
                 const lng = parseFloat(card.dataset.lng);
-                if (lat && lng && hdbMap && listingMarkers[index]) {
-                  hdbMap.flyTo({
-                    center: [lng, lat],
-                    zoom: 16,
-                    duration: 1500
+
+                if (!lat || !lng || !hdbMap || !listingMarkers[index]) {
+                  return;
+                }
+
+                // Close any previously open listing popup so only one is visible
+                if (currentListingPopup) {
+                  currentListingPopup.remove();
+                  currentListingPopup = null;
+                }
+
+                const town = card.dataset.town || 'Unknown town';
+                const flatType = card.dataset.flatType || 'Flat';
+                const block = card.dataset.block || '';
+                const street = card.dataset.street || '';
+                const priceRaw = card.dataset.price || '';
+                const remarks = card.dataset.remarks || '';
+
+                const price = priceRaw ? parseFloat(priceRaw) : null;
+                const priceRange = getPriceRange(price);
+
+                // Compute and show nearby amenities around this listing (~600m)
+                const nearby = showNearbyAmenitiesOnMap(lat, lng, 600) || [];
+
+                const amenitiesHtml = nearby.length === 0
+                  ? '<p style="font-size:11px; color:#9ca3af; margin-top:2px;">No amenities found within ~600m.</p>'
+                  : `
+                    <ul style="margin:4px 0 0; padding-left:16px; max-height:120px; overflow-y:auto;">
+                      ${nearby.map((f) => {
+                        const props = f.properties || {};
+                        const name = props.NAME || props.name || 'Amenity';
+                        const klass = props.CLASS || props.amenity_type || '';
+                        return `<li style="font-size:11px; color:#4b5563; margin-bottom:2px;">• ${name}${klass ? ` <span style="color:#9ca3af;">(${klass})</span>` : ''}</li>`;
+                      }).join('')}
+                    </ul>
+                  `;
+
+                const popupHtml = `
+                  <div style="min-width: 280px; max-width: 320px;">
+                    <div style="font-weight: 700; margin-bottom: 4px; color: #18181b; font-size: 15px;">
+                      🏠 Block ${block}, ${street}
+                    </div>
+                    <div style="font-size: 12px; color: #52525b; margin-bottom: 4px;">
+                      <span style="font-weight: 600; color: #059669;">${town}</span> • ${flatType}
+                    </div>
+                    ${price ? `
+                    <div style="font-size: 13px; color: #16a34a; font-weight: 700; margin-bottom: 4px;">
+                      Price: $${price.toLocaleString()}
+                    </div>
+                    ${priceRange ? `<div style="font-size: 11px; color: #4b5563; margin-bottom: 8px;">
+                      Approx. recent range: <span style="font-weight:600;">${priceRange.label}</span>
+                    </div>` : ''}
+                    ` : ''}
+                    ${remarks ? `<div style="font-size: 12px; color: #3f3f46; line-height: 1.5; margin-bottom: 8px;">${remarks}</div>` : ''}
+                    <div style="font-size: 11px; color: #71717a; border-top: 1px solid #e5e7eb; padding-top: 6px; margin-top: 6px;">
+                      📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}
+                    </div>
+                    <div style="font-size: 11px; color: #6b7280; margin-top: 4px;">
+                      Nearby amenities (~600m):
+                      ${amenitiesHtml}
+                    </div>
+                  </div>
+                `;
+
+                hdbMap.flyTo({
+                  center: [lng, lat],
+                  zoom: 16,
+                  duration: 1500
+                });
+
+                const marker = listingMarkers[index];
+                if (marker) {
+                  const popup = new mapboxgl.Popup({ offset: 25, maxWidth: '320px' });
+                  popup.on('open', () => {
+                    if (currentListingPopup && currentListingPopup !== popup) {
+                      currentListingPopup.remove();
+                    }
+                    currentListingPopup = popup;
                   });
-                  listingMarkers[index].togglePopup();
+
+                  popup.on('close', () => {
+                    if (currentListingPopup === popup) {
+                      currentListingPopup = null;
+                    }
+                  });
+
+                  popup.setHTML(popupHtml);
+                  marker.setPopup(popup);
+                  marker.togglePopup();
                 }
               });
             });
@@ -1146,6 +1435,37 @@ async function bootstrap() {
   
   try {
     const meta = await getJSON("/api/meta");
+    // Preload all amenities for nearby-search around listings (no markers yet)
+    try {
+      const amenityClasses = ["MRT_STATION", "SCHOOL", "CLINIC", "SUPERMARKET", "PARK"];
+      const mergedFeatures = [];
+
+      for (const cls of amenityClasses) {
+        try {
+          const data = await getJSON(`/api/amenities?class=${encodeURIComponent(cls)}`);
+          if (data && Array.isArray(data.features)) {
+            mergedFeatures.push(...data.features);
+          }
+        } catch (classErr) {
+          console.warn(`Could not preload amenities for class ${cls}:`, classErr);
+        }
+      }
+
+      amenitiesData = {
+        type: "FeatureCollection",
+        features: mergedFeatures
+      };
+
+      console.log(
+        "Preloaded amenities for proximity search (all classes):",
+        amenitiesData.features.length
+      );
+    } catch (amenityErr) {
+      console.warn(
+        "Could not preload amenities for proximity search; nearby amenities in listing popups may be unavailable.",
+        amenityErr
+      );
+    }
 
     // Load static town geometries for exact map highlighting (fallback if API does not send geometry)
     try {
