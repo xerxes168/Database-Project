@@ -572,10 +572,10 @@ function showListingsOnMap(listings) {
     const lng = parseFloat(listing.longitude);
     const lat = parseFloat(listing.latitude);
 
-    // Compute price and approximate range if available
-    const price = typeof listing.price === "number"
-      ? listing.price
-      : (listing.price ? parseFloat(listing.price) : null);
+    // Compute price (supports multiple possible fields) and approximate range if available
+    const priceCandidate = [listing.price, listing.resale_price, listing.estimated_price].find(v => v !== undefined && v !== null && v !== '');
+    const price = typeof priceCandidate === "number" ? priceCandidate : (priceCandidate ? parseFloat(priceCandidate) : null);
+    const priceSourceMonth = listing.price_source_month || listing.resale_month || listing.estimated_month || null;
     const priceRange = getPriceRange(price);
 
     // Create custom marker
@@ -636,13 +636,14 @@ function showListingsOnMap(listings) {
             <span style="font-weight: 600; color: #059669;">${listing.town}</span> • ${listing.flat_type}
           </div>
           ${price ? `
-          <div style="font-size: 13px; color: #16a34a; font-weight: 700; margin-bottom: 4px;">
-            Price: $${price.toLocaleString()}
+          <div style="font-size: 13px; color: #16a34a; font-weight: 700; margin-bottom: 2px;">
+            Price: $${Number(price).toLocaleString()}
           </div>
+          ${priceSourceMonth ? `<div style="font-size: 10px; color: #6b7280; margin-bottom: 2px;">Source: HDB resale ${priceSourceMonth}</div>` : ``}
           ${priceRange ? `<div style="font-size: 11px; color: #4b5563; margin-bottom: 8px;">
             Approx. recent range: <span style="font-weight:600;">${priceRange.label}</span>
-          </div>` : ""}
-          ` : ""}
+          </div>` : ``}
+          ` : ``}
           <div style="font-size: 12px; color: #3f3f46; line-height: 1.5; margin-bottom: 8px;">
             ${remarksPreview}
           </div>
@@ -1238,7 +1239,8 @@ async function setupListingsPanel() {
                       data-flat-type="${listing.flat_type}"
                       data-block="${listing.block}"
                       data-street="${listing.street}"
-                      data-price="${listing.price || ''}"
+                      data-price="${(listing.price ?? listing.resale_price ?? listing.estimated_price) || ''}"
+                      data-price-source-month="${listing.price_source_month ?? listing.resale_month ?? listing.estimated_month ?? ''}"
                       data-remarks="${(remarksPreview || '').replace(/"/g, '&quot;')}">
                   <div class="flex items-start justify-between mb-2">
                     <div class="flex-1">
@@ -1285,6 +1287,7 @@ async function setupListingsPanel() {
                 const block = card.dataset.block || '';
                 const street = card.dataset.street || '';
                 const priceRaw = card.dataset.price || '';
+                const priceSourceMonth = card.dataset.priceSourceMonth || '';
                 const remarks = card.dataset.remarks || '';
 
                 const price = priceRaw ? parseFloat(priceRaw) : null;
@@ -1315,13 +1318,14 @@ async function setupListingsPanel() {
                       <span style="font-weight: 600; color: #059669;">${town}</span> • ${flatType}
                     </div>
                     ${price ? `
-                    <div style="font-size: 13px; color: #16a34a; font-weight: 700; margin-bottom: 4px;">
-                      Price: $${price.toLocaleString()}
+                    <div style="font-size: 13px; color: #16a34a; font-weight: 700; margin-bottom: 2px;">
+                      Price: $${Number(price).toLocaleString()}
                     </div>
+                    ${priceSourceMonth ? `<div style="font-size: 10px; color: #6b7280; margin-bottom: 2px;">Source: HDB resale ${priceSourceMonth}</div>` : ``}
                     ${priceRange ? `<div style="font-size: 11px; color: #4b5563; margin-bottom: 8px;">
                       Approx. recent range: <span style="font-weight:600;">${priceRange.label}</span>
-                    </div>` : ''}
-                    ` : ''}
+                    </div>` : ``}
+                    ` : ``}
                     ${remarks ? `<div style="font-size: 12px; color: #3f3f46; line-height: 1.5; margin-bottom: 8px;">${remarks}</div>` : ''}
                     <div style="font-size: 11px; color: #71717a; border-top: 1px solid #e5e7eb; padding-top: 6px; margin-top: 6px;">
                       📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}
