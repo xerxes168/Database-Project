@@ -179,6 +179,75 @@
             </p>
           </div>
         </div>
+        
+        <!-- User Menu -->
+        <div class="flex items-center space-x-3">
+          {% if current_user.is_authenticated %}
+            <!-- Authenticated User -->
+            <div class="flex items-center space-x-2">
+              <div class="text-right">
+                <div class="text-sm font-medium text-slate-900">{{ current_user.full_name }}</div>
+                <div class="text-xs text-zinc-600">
+                  {% if current_user.is_admin %}
+                    <span class="text-purple-600 font-semibold">Admin</span>
+                  {% else %}
+                    <span class="text-emerald-600">User</span>
+                  {% endif %}
+                </div>
+              </div>
+              
+              <div class="relative">
+                <button id="user-menu-btn" class="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 text-white font-semibold flex items-center justify-center hover:shadow-lg transition">
+                  {{ current_user.full_name[0].upper() }}
+                </button>
+                
+                <!-- Dropdown Menu -->
+                <div id="user-menu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-zinc-200 py-1 z-50">
+                  {% if current_user.is_admin %}
+                  <a href="/admin" class="block px-4 py-2 text-sm text-slate-900 hover:bg-slate-50 transition">
+                    <span class="flex items-center space-x-2">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                      </svg>
+                      <span>Admin Dashboard</span>
+                    </span>
+                  </a>
+                  <div class="border-t border-zinc-200 my-1"></div>
+                  {% endif %}
+                  
+                  <a href="/" class="block px-4 py-2 text-sm text-slate-900 hover:bg-slate-50 transition">
+                    <span class="flex items-center space-x-2">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h4m4 0h4a1 1 0 001-1V10"></path>
+                      </svg>
+                      <span>Home</span>
+                    </span>
+                  </a>
+                  
+                  <div class="border-t border-zinc-200 my-1"></div>
+                  
+                  <button id="btn-logout" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition">
+                    <span class="flex items-center space-x-2">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                      </svg>
+                      <span>Logout</span>
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          {% else %}
+            <!-- Not Authenticated -->
+            <a href="/login" class="px-4 py-2 text-sm font-medium text-slate-700 hover:text-slate-900 transition">
+              Login
+            </a>
+            <a href="/register" class="px-4 py-2 text-sm font-medium bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white rounded-lg transition shadow-md">
+              Sign Up
+            </a>
+          {% endif %}
+        </div>
       </nav>
 
       <div class="flex flex-1 overflow-hidden">
@@ -505,4 +574,53 @@
   <script src="{{ url_for('static', filename='js/app.js') }}"></script>
   {% block scripts %}{% endblock %}
 </body>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // User menu toggle
+  const userMenuBtn = document.getElementById('user-menu-btn');
+  const userMenu = document.getElementById('user-menu');
+  
+  if (userMenuBtn && userMenu) {
+    userMenuBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      userMenu.classList.toggle('hidden');
+    });
+    
+    // Close menu when clicking outside
+    document.addEventListener('click', () => {
+      userMenu.classList.add('hidden');
+    });
+    
+    userMenu.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+  }
+  
+  // Logout button
+  const logoutBtn = document.getElementById('btn-logout');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', async () => {
+      try {
+        const response = await fetch('/api/auth/logout', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        const data = await response.json();
+        
+        if (data.ok) {
+          window.location.href = '/login';
+        }
+      } catch (error) {
+        console.error('Logout error:', error);
+        alert('Failed to logout. Please try again.');
+      }
+    });
+  }
+});
+</script>
+
 </html>

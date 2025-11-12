@@ -488,3 +488,189 @@ def get_market_statistics():
             pass
     
     return {}
+
+# Add these functions to your existing db_mysql.py file
+
+# ========== USER MANAGEMENT FUNCTIONS ==========
+
+def get_user_by_email(email):
+    """Get user by email"""
+    with engine.connect() as conn:
+        result = conn.execute(text("""
+            SELECT user_id, email, full_name, is_admin, is_active, created_at, last_login
+            FROM users
+            WHERE email = :email
+        """), {"email": email})
+        
+        row = result.fetchone()
+        if row:
+            return dict(row._mapping)
+        return None
+
+def get_user_by_id(user_id):
+    """Get user by ID"""
+    with engine.connect() as conn:
+        result = conn.execute(text("""
+            SELECT user_id, email, full_name, is_admin, is_active, created_at, last_login
+            FROM users
+            WHERE user_id = :user_id
+        """), {"user_id": user_id})
+        
+        row = result.fetchone()
+        if row:
+            return dict(row._mapping)
+        return None
+
+def get_user_preferences(user_id):
+    """Get user preferences from MySQL"""
+    with engine.connect() as conn:
+        result = conn.execute(text("""
+            SELECT *
+            FROM user_preferences
+            WHERE user_id = :user_id
+        """), {"user_id": user_id})
+        
+        row = result.fetchone()
+        if row:
+            return dict(row._mapping)
+        return None
+
+def save_user_preferences(user_id, preferences):
+    """Save user preferences to MySQL"""
+    import json
+    
+    with engine.connect() as conn:
+        # Check if preferences exist
+        existing = get_user_preferences(user_id)
+        
+        if existing:
+            # Update existing
+            conn.execute(text("""
+                UPDATE user_preferences
+                SET preferred_towns = :preferred_towns,
+                    preferred_flat_types = :preferred_flat_types,
+                    budget_min = :budget_min,
+                    budget_max = :budget_max,
+                    email_notifications = :email_notifications
+                WHERE user_id = :user_id
+            """), {
+                "user_id": user_id,
+                "preferred_towns": json.dumps(preferences.get("preferred_towns", [])),
+                "preferred_flat_types": json.dumps(preferences.get("preferred_flat_types", [])),
+                "budget_min": preferences.get("budget_min"),
+                "budget_max": preferences.get("budget_max"),
+                "email_notifications": preferences.get("email_notifications", True)
+            })
+        else:
+            # Insert new
+            conn.execute(text("""
+                INSERT INTO user_preferences 
+                (user_id, preferred_towns, preferred_flat_types, budget_min, budget_max, email_notifications)
+                VALUES (:user_id, :preferred_towns, :preferred_flat_types, :budget_min, :budget_max, :email_notifications)
+            """), {
+                "user_id": user_id,
+                "preferred_towns": json.dumps(preferences.get("preferred_towns", [])),
+                "preferred_flat_types": json.dumps(preferences.get("preferred_flat_types", [])),
+                "budget_min": preferences.get("budget_min"),
+                "budget_max": preferences.get("budget_max"),
+                "email_notifications": preferences.get("email_notifications", True)
+            })
+        
+        conn.commit()
+        return True
+
+def get_user_login_history(user_id, limit=10):
+    """Get user's login history"""
+    with engine.connect() as conn:
+        result = conn.execute(text("""
+            SELECT log_id, login_timestamp, ip_address, login_successful, failure_reason
+            FROM login_logs
+            WHERE user_id = :user_id
+            ORDER BY login_timestamp DESC
+            LIMIT :limit
+        """), {"user_id": user_id, "limit": limit})
+        
+        return [dict(row._mapping) for row in result]
+
+def get_user_activity_stats(user_id, days=30):
+    """Get user's activity statistics"""
+    with engine.connect() as conn:
+        result = conn.execute(text("""
+            CALL sp_get_user_activity_summary(:user_id, :days)
+        """), {"user_id": user_id, "days": days})
+        
+        return [dict(row._mapping) for row in result]
+
+# ========== ADMIN ANALYTICS FUNCTIONS ==========
+
+def get_system_statistics():
+    """Get overall system statistics (admin only)"""
+    with engine.connect() as conn:
+        result = conn.execute(text("""
+            SELECT 
+                (SELECT COUNT(*) FROM users) as total_users,
+                (SELECT COUNT(*) FROM users WHERE is_active = TRUE) as active_users,
+                (SELECT COUNT(*) FROM users WHERE is_admin = TRUE) as admin_users,
+                (SELECT COUNT(*) FROM login_logs WHERE login_successful = TRUE 
+                 AND login_timestamp >= DATE_SUB(NOW(), INTERVAL 24 HOUR)) as logins_24h,
+                (SELECT COUNT(DISTINCT user_id) FROM user_activity 
+                 WHERE timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)) as active_users_7d,
+                (SELECT COUNT(*) FROM user_activity) as total_activities,
+                (SELECT COUNT(*) FROM resale_flat_prices) as total_transactions
+        """))
+        
+        row = result.fetchone()
+        if row:
+            return dict(row._mapping)
+        return {}
+
+def get_popular_towns(limit=10):
+    """Get most popular towns based on user searches"""
+    with engine.connect() as conn:
+        result = conn.execute(text("""
+            SELECT 
+                JSON_EXTRACT(activity_data, '$.town') as town,
+                COUNT(*) as search_count
+            FROM user_activity
+            WHERE activity_type = 'search'
+              AND JSON_EXTRACT(activity_data, '$.town') IS NOT NULL
+              AND timestamp >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+            GROUP BY JSON_EXTRACT(activity_data, '$.town')
+            ORDER BY search_count DESC
+            LIMIT :limit
+        """), {"limit": limit})
+        
+        return [dict(row._mapping) for row in result]
+
+def get_popular_flat_types(limit=10):
+    """Get most popular flat types based on user searches"""
+    with engine.connect() as conn:
+        result = conn.execute(text("""
+            SELECT 
+                JSON_EXTRACT(activity_data, '$.flat_type') as flat_type,
+                COUNT(*) as search_count
+            FROM user_activity
+            WHERE activity_type = 'search'
+              AND JSON_EXTRACT(activity_data, '$.flat_type') IS NOT NULL
+              AND timestamp >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+            GROUP BY JSON_EXTRACT(activity_data, '$.flat_type')
+            ORDER BY search_count DESC
+            LIMIT :limit
+        """), {"limit": limit})
+        
+        return [dict(row._mapping) for row in result]
+
+def get_recent_user_registrations(days=7):
+    """Get recent user registrations"""
+    with engine.connect() as conn:
+        result = conn.execute(text("""
+            SELECT 
+                DATE(created_at) as registration_date,
+                COUNT(*) as new_users
+            FROM users
+            WHERE created_at >= DATE_SUB(NOW(), INTERVAL :days DAY)
+            GROUP BY DATE(created_at)
+            ORDER BY registration_date DESC
+        """), {"days": days})
+        
+        return [dict(row._mapping) for row in result]

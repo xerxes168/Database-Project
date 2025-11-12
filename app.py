@@ -1,5 +1,6 @@
 # app.py
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for
+from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.utils import secure_filename
 import os, json
 from datetime import datetime
@@ -12,8 +13,14 @@ from db_mysql import (
     get_total_transaction_count, get_flat_type_specs,
     get_current_mortgage_rate, get_current_loan_rules,
     get_latest_household_income, get_household_expenditure_latest,
-    calculate_affordability_enhanced, get_market_statistics
+    calculate_affordability_enhanced, get_market_statistics,
+    # NEW: Auth-related imports
+    get_user_by_id, get_user_preferences, save_user_preferences,
+    get_user_login_history, get_user_activity_stats,
+    get_system_statistics, get_popular_towns, get_popular_flat_types,
+    get_recent_user_registrations
 )
+
 from db_mongo import (
     # Amenities
     save_geojson_amenities, get_amenity_stats_global, get_amenity_stats_by_town,
@@ -31,14 +38,33 @@ from db_mongo import (
     # Init
     initialize_mongodb
 )
+
+# NEW: Authentication imports
+from auth import (
+    login_manager, bcrypt,
+    register_user, authenticate_user, log_user_activity,
+    admin_required, change_password,
+    get_all_users, get_activity_summary, toggle_user_active_status
+)
+
 from bson import ObjectId
 
+# ========== FLASK APP INITIALIZATION ==========
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 app.config["UPLOAD_FOLDER"] = os.path.join("data", "uploads")
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
+# Initialize Flask-Login
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+login_manager.login_message = 'Please log in to access this page.'
+
+# Initialize Flask-Bcrypt
+bcrypt.init_app(app)
+
+# MongoDB connection
 MONGO_URI = os.environ.get('MONGO_URI', 'mongodb+srv://greggy_dbuser:JesusKing@homefinder-mongo.7d67tvq.mongodb.net/')
 client = MongoClient(MONGO_URI)
 db = client['homefinder']
@@ -51,19 +77,199 @@ try:
 except Exception as e:
     print(f"✗ MongoDB initialization warning: {e}")
 
-# Session management - simple demo user
-DEMO_USER_EMAIL = "demo@hdbhomefinder.sg"
-
+# ==================== PUBLIC ROUTES ====================
 
 @app.route("/")
 def index():
+    """Home page - accessible to all"""
+    if current_user.is_authenticated:
+        return render_template("index.html", user=current_user)
     return render_template("index.html")
 
+@app.route("/login")
+def login_page():
+    """Login page"""
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    return render_template("login.html")
 
-# ==================== METADATA ====================
+@app.route("/register")
+def register_page():
+    """Registration page"""
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    return render_template("register.html")
+
+# ==================== AUTHENTICATION API ====================
+
+@app.route("/api/auth/register", methods=["POST"])
+def api_register():
+    """User registration endpoint"""
+    data = request.get_json() or {}
+    
+    email = data.get("email", "").strip()
+    password = data.get("password", "")
+    full_name = data.get("full_name", "").strip()
+    
+    if not email or not password or not full_name:
+        return jsonify({"ok": False, "error": "All fields are required"}), 400
+    
+    success, result = register_user(email, password, full_name)
+    
+    if success:
+        return jsonify({
+            "ok": True, 
+            "message": "Registration successful! Please log in.",
+            "user_id": result
+        })
+    else:
+        return jsonify({"ok": False, "error": result}), 400
+
+@app.route("/api/auth/login", methods=["POST"])
+def api_login():
+    """User login endpoint"""
+    data = request.get_json() or {}
+    
+    email = data.get("email", "").strip()
+    password = data.get("password", "")
+    
+    if not email or not password:
+        return jsonify({"ok": False, "error": "Email and password required"}), 400
+    
+    # Get client info
+    ip_address = request.remote_addr
+    user_agent = request.headers.get('User-Agent', '')[:255]
+    
+    success, result = authenticate_user(email, password, ip_address, user_agent)
+    
+    if success:
+        user = result
+        login_user(user, remember=True)
+        
+        return jsonify({
+            "ok": True,
+            "message": "Login successful",
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "full_name": user.full_name,
+                "is_admin": user.is_admin
+            }
+        })
+    else:
+        return jsonify({"ok": False, "error": result}), 401
+
+@app.route("/api/auth/logout", methods=["POST"])
+@login_required
+def api_logout():
+    """User logout endpoint"""
+    logout_user()
+    return jsonify({"ok": True, "message": "Logged out successfully"})
+
+@app.route("/api/auth/me", methods=["GET"])
+@login_required
+def api_current_user():
+    """Get current user info"""
+    return jsonify({
+        "ok": True,
+        "user": {
+            "id": current_user.id,
+            "email": current_user.email,
+            "full_name": current_user.full_name,
+            "is_admin": current_user.is_admin,
+            "is_active": current_user.is_active
+        }
+    })
+
+@app.route("/api/auth/change-password", methods=["POST"])
+@login_required
+def api_change_password():
+    """Change user password"""
+    data = request.get_json() or {}
+    
+    old_password = data.get("old_password", "")
+    new_password = data.get("new_password", "")
+    
+    if not old_password or not new_password:
+        return jsonify({"ok": False, "error": "Both passwords required"}), 400
+    
+    success, message = change_password(current_user.id, old_password, new_password)
+    
+    if success:
+        return jsonify({"ok": True, "message": message})
+    else:
+        return jsonify({"ok": False, "error": message}), 400
+
+# ==================== USER PROFILE & PREFERENCES ====================
+
+@app.route("/api/user/profile", methods=["GET"])
+@login_required
+def api_get_user_profile():
+    """Get user profile and preferences"""
+    try:
+        # Get MySQL user data
+        user_data = get_user_by_id(current_user.id)
+        
+        # Get MySQL preferences
+        preferences = get_user_preferences(current_user.id) or {}
+        
+        # Get MongoDB profile
+        mongo_profile = get_user_profile(current_user.email) or {}
+        
+        return jsonify({
+            "ok": True,
+            "profile": {
+                **user_data,
+                "preferences": preferences,
+                "search_history": mongo_profile.get("search_history", [])[-10:],  # Last 10
+                "saved_listings": mongo_profile.get("saved_listings", [])
+            }
+        })
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route("/api/user/preferences", methods=["POST"])
+@login_required
+def api_save_user_preferences():
+    """Save user preferences"""
+    try:
+        data = request.get_json() or {}
+        
+        # Save to MySQL
+        save_user_preferences(current_user.id, data)
+        
+        # Also update MongoDB profile
+        mongo_profile = get_user_profile(current_user.email) or {}
+        mongo_profile["preferences"] = data
+        save_user_profile(mongo_profile)
+        
+        return jsonify({"ok": True, "message": "Preferences saved"})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route("/api/user/activity", methods=["GET"])
+@login_required
+def api_get_user_activity():
+    """Get user activity history"""
+    try:
+        days = int(request.args.get("days", 30))
+        
+        activity_stats = get_user_activity_stats(current_user.id, days)
+        login_history = get_user_login_history(current_user.id, 10)
+        
+        return jsonify({
+            "ok": True,
+            "activity_stats": activity_stats,
+            "login_history": login_history
+        })
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+# ==================== METADATA (AUTH-AWARE) ====================
+
 @app.route("/api/meta", methods=["GET"])
 def api_meta():
-    """Returns metadata for form dropdowns."""
+    """Returns metadata for form dropdowns - accessible to all but logs if authenticated"""
     try:
         towns = get_towns()
         flat_types = get_flat_types()
@@ -73,6 +279,10 @@ def api_meta():
         loan_rules = get_current_loan_rules()
         market_stats = get_market_statistics()
         
+        # Log activity if user is authenticated
+        if current_user.is_authenticated:
+            log_user_activity(current_user.id, 'view_amenities', {"action": "get_metadata"})
+        
         return jsonify({
             "towns": towns,
             "flat_types": flat_types,
@@ -81,7 +291,12 @@ def api_meta():
             "amenity_types": ["MRT_STATION", "SCHOOL", "CLINIC", "SUPERMARKET", "PARK"],
             "current_mortgage_rate": mortgage_rate,
             "current_loan_rules": loan_rules,
-            "market_statistics": market_stats
+            "market_statistics": market_stats,
+            "authenticated": current_user.is_authenticated,
+            "user": {
+                "full_name": current_user.full_name if current_user.is_authenticated else None,
+                "is_admin": current_user.is_admin if current_user.is_authenticated else False
+            }
         })
     except Exception as e:
         print(f"Error in /api/meta: {e}")
@@ -94,8 +309,8 @@ def api_meta():
             "total_transactions": 0
         }), 500
 
+# ==================== SQL QUERIES (WITH ACTIVITY LOGGING) ====================
 
-# ==================== SQL QUERIES ====================
 @app.route("/api/search/trends", methods=["POST"])
 def api_search_trends():
     """Advanced SQL query with window functions - Price trends analysis."""
@@ -108,16 +323,18 @@ def api_search_trends():
     try:
         rows = query_trends(town, flat_type, start_month, end_month)
         
-        # Track search in user history
-        try:
-            user_email = session.get("user_email", DEMO_USER_EMAIL)
-            add_search_to_history(user_email, {
+        # Log activity if authenticated
+        if current_user.is_authenticated:
+            log_user_activity(current_user.id, 'search', {
+                "town": town,
+                "flat_type": flat_type,
+                "type": "trends"
+            })
+            add_search_to_history(current_user.email, {
                 "town": town,
                 "flat_type": flat_type,
                 "type": "trends"
             }, len(rows))
-        except Exception as e:
-            print(f"Warning: Could not track search history: {e}")
         
         return jsonify({
             "ok": True, 
@@ -128,8 +345,8 @@ def api_search_trends():
         print(f"Error in /api/search/trends: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
-
 @app.route("/api/search/transactions", methods=["POST"])
+@login_required  # Require login for transaction searches
 def api_search_transactions():
     """Get recent transactions with details."""
     payload = request.get_json() or {}
@@ -140,43 +357,40 @@ def api_search_transactions():
     try:
         transactions = query_transactions(town, flat_type, limit)
         
-        # Track search
-        try:
-            user_email = session.get("user_email", DEMO_USER_EMAIL)
-            add_search_to_history(user_email, {
-                "town": town,
-                "flat_type": flat_type,
-                "type": "transactions"
-            }, len(transactions))
-        except Exception as e:
-            print(f"Warning: Could not track search history: {e}")
+        # Log activity
+        log_user_activity(current_user.id, 'search', {
+            "town": town,
+            "flat_type": flat_type,
+            "type": "transactions"
+        })
+        
+        add_search_to_history(current_user.email, {
+            "town": town,
+            "flat_type": flat_type,
+            "type": "transactions"
+        }, len(transactions))
         
         return jsonify({"ok": True, "transactions": transactions, "count": len(transactions)})
     except Exception as e:
         print(f"Error in /api/search/transactions: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
-
 @app.route("/api/compare/towns", methods=["POST"])
+@login_required  # Require login for comparisons
 def api_compare_towns():
     """Compare multiple towns with integrated data."""
     payload = request.get_json() or {}
     towns_list = payload.get("towns", [])
     flat_type = payload.get("flat_type")
-
     
     try:
-        # Get SQL comparison data
         comparison = query_town_comparison(towns_list, flat_type)
-
-        # Get income data for affordability context
         income_data = get_latest_household_income()
         
-        # Enrich with MongoDB town metadata (homefinder.town_metadata)
+        # Enrich with MongoDB town metadata
         for town_data in comparison:
             town_name = town_data["town"]
             
-            # Add town metadata
             try:
                 metadata = get_town_metadata(town_name)
                 if metadata:
@@ -184,16 +398,15 @@ def api_compare_towns():
                     town_data["maturity"] = metadata.get("maturity", "Unknown")
                     town_data["characteristics"] = metadata.get("characteristics", [])
                     town_data["description"] = metadata.get("description", "")
-                    # Optional geometry/center data for map highlighting
+                    
                     center = metadata.get("center") or metadata.get("centroid")
                     if isinstance(center, dict):
                         town_data["center_lat"] = center.get("lat") or center.get("latitude")
                         town_data["center_lng"] = center.get("lng") or center.get("longitude")
                     elif isinstance(center, (list, tuple)) and len(center) == 2:
-                        # Assume [lng, lat] ordering
                         town_data["center_lat"], town_data["center_lng"] = center[1], center[0]
+                    
                     geometry = metadata.get("geometry") or metadata.get("boundary")
-                    # Only attach if geometry looks like a GeoJSON object
                     if isinstance(geometry, dict) and "type" in geometry:
                         town_data["geometry"] = geometry
                 else:
@@ -206,27 +419,25 @@ def api_compare_towns():
                 town_data["maturity"] = "Unknown"
                 town_data["characteristics"] = []
             
-            # Calculate affordability score based on income
+            # Calculate affordability score
             median_psm = town_data.get('median_psm', 0)
-            avg_price = town_data.get('avg_price', 0)
-
             if median_psm > 0 and income_data and income_data.get('resident_median'):
-                # Convert to float to avoid Decimal type issues
                 monthly_income = float(income_data['resident_median'])
                 median_psm_float = float(median_psm)
-                
-                # Assume 90sqm flat
                 estimated_flat_price = median_psm_float * 90
-                
-                # Affordability = income / (price/300) ratio, scaled to 10
                 affordability_ratio = (monthly_income * 300) / estimated_flat_price if estimated_flat_price > 0 else 0
                 town_data['affordability_score'] = round(min(10, max(1, affordability_ratio * 3)), 1)
             else:
                 town_data['affordability_score'] = 5.0
             
-            # Mock amenity counts (can be enhanced with actual queries)
             town_data['mrt_count'] = 2
             town_data['school_count'] = 5
+        
+        # Log activity
+        log_user_activity(current_user.id, 'comparison', {
+            "towns": towns_list,
+            "flat_type": flat_type
+        })
         
         return jsonify({
             "ok": True, 
@@ -236,9 +447,10 @@ def api_compare_towns():
         print(f"Error in /api/compare/towns: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
+# ==================== AFFORDABILITY (WITH LOGGING) ====================
 
-# ==================== AFFORDABILITY ====================
 @app.route("/api/affordability", methods=["POST"])
+@login_required
 def api_affordability():
     """Calculate affordability with enhanced mortgage rules and rates"""
     payload = request.get_json() or {}
@@ -246,9 +458,8 @@ def api_affordability():
     try:
         income = float(payload.get("income", 0))
         expenses = float(payload.get("expenses", 0))
-        loan_type = payload.get("loan_type", "hdb")  # "hdb" or "bank"
+        loan_type = payload.get("loan_type", "hdb")
         
-        # Use enhanced calculation from db_mysql
         result = calculate_affordability_enhanced(
             income=income,
             expenses=expenses,
@@ -256,11 +467,16 @@ def api_affordability():
             use_current_rates=True
         )
         
-        # Get expenditure data for context
+        # Log activity
+        log_user_activity(current_user.id, 'affordability_calc', {
+            "income": income,
+            "expenses": expenses,
+            "affordable": result.get("affordable")
+        })
+        
         expenditure_data = get_household_expenditure_latest()
         housing_expense = next((e for e in expenditure_data if "Housing" in e["category"]), None)
         
-        # Add context
         result["housing_expense_avg"] = housing_expense["amount"] if housing_expense else None
         result["loan_type"] = loan_type
         
@@ -289,27 +505,8 @@ def api_affordability_context():
         print(f"Error in /api/affordability/context: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
+# ==================== AMENITIES (WITH LOGGING) ====================
 
-@app.route("/api/flat-specs", methods=["GET"])
-def api_flat_specs():
-    """Get flat type specifications"""
-    flat_type = request.args.get("flat_type")
-    
-    try:
-        if flat_type:
-            specs = get_flat_type_specs(flat_type)
-            if specs:
-                return jsonify({"ok": True, "specs": specs})
-            else:
-                return jsonify({"ok": False, "error": "Flat type not found"}), 404
-        else:
-            all_specs = get_flat_type_specs()
-            return jsonify({"ok": True, "specs": all_specs})
-    except Exception as e:
-        print(f"Error in /api/flat-specs: {e}")
-        return jsonify({"ok": False, "error": str(e)}), 500
-
-# ==================== AMENITIES (MongoDB GeoJSON) ====================
 @app.route("/api/amenities")
 def api_amenities():
     """Get amenities GeoJSON for map display."""
@@ -321,12 +518,12 @@ def api_amenities():
 
     try:
         docs = list(collection.find(query, {"_id": 0}).limit(1000))
-
-        features = []
-        for doc in docs:
-            if doc.get("type") == "Feature" and "geometry" in doc:
-                features.append(doc)
-
+        features = [doc for doc in docs if doc.get("type") == "Feature" and "geometry" in doc]
+        
+        # Log if authenticated
+        if current_user.is_authenticated:
+            log_user_activity(current_user.id, 'view_amenities', {"class": amenity_class})
+        
         geojson = {
             "type": "FeatureCollection",
             "features": features
@@ -339,74 +536,12 @@ def api_amenities():
             "features": []
         })
 
+# ==================== LISTING REMARKS SEARCH ====================
 
-@app.route("/api/amenities/upload", methods=["POST"])
-def api_amenities_upload():
-    """Upload and store GeoJSON amenity data."""
-    f = request.files.get("file")
-    if not f:
-        return jsonify({"ok": False, "error": "No file provided"}), 400
-    
-    if not f.filename.endswith(('.geojson', '.json')):
-        return jsonify({"ok": False, "error": "Only GeoJSON files allowed"}), 400
-    
-    fn = secure_filename(f.filename)
-    path = os.path.join(app.config["UPLOAD_FOLDER"], fn)
-    f.save(path)
-    
-    try:
-        with open(path, 'r') as fp:
-            geojson_data = json.load(fp)
-        
-        features = geojson_data.get('features', [])
-        result = save_geojson_amenities(features)
-        
-        return jsonify({
-            "ok": True, 
-            "filename": fn,
-            "feature_count": len(features),
-            "upserted": result.get("upserts", 0),
-            "modified": result.get("modified", 0),
-            "uploaded_at": datetime.utcnow().isoformat()
-        })
-    except json.JSONDecodeError:
-        return jsonify({"ok": False, "error": "Invalid JSON format"}), 400
-    except Exception as e:
-        print(f"Error in /api/amenities/upload: {e}")
-        return jsonify({"ok": False, "error": str(e)}), 500
-
-
-@app.route("/api/amenities/stats", methods=["GET"])
-def api_amenities_stats():
-    """Get amenity statistics."""
-    town = request.args.get("town")
-    
-    try:
-        if town:
-            stats = get_amenity_stats_by_town(town)
-        else:
-            global_stats = get_amenity_stats_global()
-            stats = {
-                "town": "ALL",
-                "total_amenities": sum(s.get("count", 0) for s in global_stats)
-            }
-            for s in global_stats:
-                key = s.get("amenity_type", "other").lower() + "_count"
-                stats[key] = s.get("count", 0)
-        
-        return jsonify({"ok": True, "stats": stats})
-    except Exception as e:
-        print(f"Error in /api/amenities/stats: {e}")
-        return jsonify({"ok": False, "error": str(e)}), 500
-
-
-# ==================== LISTING REMARKS (MongoDB TEXT SEARCH) ====================
 @app.route("/api/listings/search", methods=["POST"])
+@login_required
 def api_listings_search():
-    """
-    Full-text search on listing remarks.
-    Demonstrates MongoDB text indexing and search capabilities.
-    """
+    """Full-text search on listing remarks."""
     payload = request.get_json() or {}
     query = payload.get("query", "")
     town = payload.get("town")
@@ -415,11 +550,17 @@ def api_listings_search():
     
     try:
         if not query:
-            # If no search query, get recent listings
             results = get_recent_listings(town, limit)
         else:
-            # Full-text search
             results = search_listing_remarks(query, town, flat_type, limit)
+        
+        # Log activity
+        log_user_activity(current_user.id, 'search', {
+            "query": query,
+            "town": town,
+            "flat_type": flat_type,
+            "type": "listings"
+        })
         
         return jsonify({
             "ok": True,
@@ -431,131 +572,41 @@ def api_listings_search():
         print(f"Error in /api/listings/search: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
-
-@app.route("/api/listings/recent", methods=["GET"])
-def api_listings_recent():
-    """Get recent listing remarks."""
-    town = request.args.get("town")
-    limit = int(request.args.get("limit", 10))
-    
-    try:
-        results = get_recent_listings(town, limit)
-        return jsonify({"ok": True, "results": results, "count": len(results)})
-    except Exception as e:
-        print(f"Error in /api/listings/recent: {e}")
-        return jsonify({"ok": False, "error": str(e)}), 500
-
-
-# ==================== TOWN METADATA ====================
-@app.route("/api/towns/metadata", methods=["GET"])
-def api_towns_metadata():
-    """Get town metadata with optional filtering."""
-    region = request.args.get("region")
-    maturity = request.args.get("maturity")
-    
-    try:
-        metadata = get_all_town_metadata(region, maturity)
-        return jsonify({"ok": True, "towns": metadata, "count": len(metadata)})
-    except Exception as e:
-        print(f"Error in /api/towns/metadata: {e}")
-        return jsonify({"ok": False, "error": str(e)}), 500
-
-
-@app.route("/api/towns/<town_name>/metadata", methods=["GET"])
-def api_town_metadata_detail(town_name):
-    """Get detailed metadata for a specific town."""
-    try:
-        metadata = get_town_metadata(town_name)
-        if metadata:
-            return jsonify({"ok": True, "metadata": metadata})
-        else:
-            return jsonify({"ok": False, "error": "Town not found"}), 404
-    except Exception as e:
-        print(f"Error in /api/towns/{town_name}/metadata: {e}")
-        return jsonify({"ok": False, "error": str(e)}), 500
-
-
-@app.route("/api/towns/search-by-characteristics", methods=["POST"])
-def api_towns_search_characteristics():
-    """Search towns by characteristics/tags."""
-    payload = request.get_json() or {}
-    characteristics = payload.get("characteristics", [])
-    
-    try:
-        towns = search_towns_by_characteristics(characteristics)
-        return jsonify({"ok": True, "towns": towns, "count": len(towns)})
-    except Exception as e:
-        print(f"Error in /api/towns/search-by-characteristics: {e}")
-        return jsonify({"ok": False, "error": str(e)}), 500
-
-
-# ==================== USER PROFILES & RECOMMENDATIONS ====================
-@app.route("/api/user/profile", methods=["GET", "POST"])
-def api_user_profile():
-    """Get or create user profile."""
-    if request.method == "GET":
-        user_email = session.get("user_email", DEMO_USER_EMAIL)
-        try:
-            profile = get_user_profile(user_email)
-            if not profile:
-                return jsonify({"ok": False, "error": "Profile not found"}), 404
-            return jsonify({"ok": True, "profile": profile})
-        except Exception as e:
-            print(f"Error in GET /api/user/profile: {e}")
-            return jsonify({"ok": False, "error": str(e)}), 500
-    
-    else:  # POST
-        payload = request.get_json() or {}
-        try:
-            profile_id = save_user_profile(payload)
-            session["user_email"] = payload.get("email", DEMO_USER_EMAIL)
-            return jsonify({"ok": True, "profile_id": profile_id})
-        except Exception as e:
-            print(f"Error in POST /api/user/profile: {e}")
-            return jsonify({"ok": False, "error": str(e)}), 500
-
-
 @app.route("/api/user/favorites", methods=["POST"])
+@login_required
 def api_user_add_favorite():
     """Add listing to user favorites."""
     payload = request.get_json() or {}
-    user_email = session.get("user_email", DEMO_USER_EMAIL)
     
     try:
         save_listing_to_favorites(
-            user_email,
+            current_user.email,
             payload.get("block"),
             payload.get("street"),
             payload.get("town")
         )
+        
+        # Log activity
+        log_user_activity(current_user.id, 'save_favorite', {
+            "town": payload.get("town"),
+            "block": payload.get("block")
+        })
+        
         return jsonify({"ok": True, "message": "Added to favorites"})
     except Exception as e:
         print(f"Error in /api/user/favorites: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
+# ==================== SCENARIOS ====================
 
-@app.route("/api/user/recommendations", methods=["GET"])
-def api_user_recommendations():
-    """Get personalized town recommendations."""
-    user_email = session.get("user_email", DEMO_USER_EMAIL)
-    
-    try:
-        recommendations = get_user_recommendations(user_email)
-        return jsonify({"ok": True, "recommended_towns": recommendations})
-    except Exception as e:
-        print(f"Error in /api/user/recommendations: {e}")
-        return jsonify({"ok": False, "error": str(e)}), 500
-
-
-# ==================== SCENARIOS (MongoDB) ====================
 @app.route("/api/scenarios", methods=["GET", "POST", "DELETE"])
+@login_required
 def api_scenarios():
     """Manage affordability scenarios in MongoDB."""
     
     if request.method == "GET":
-        user_email = request.args.get("user_id", session.get("user_email"))
         try:
-            scenarios = list_scenarios(user_email)
+            scenarios = list_scenarios(current_user.email)
             return jsonify({"ok": True, "items": scenarios})
         except Exception as e:
             print(f"Error in GET /api/scenarios: {e}")
@@ -569,7 +620,7 @@ def api_scenarios():
         
         try:
             payload["created_at"] = datetime.utcnow()
-            payload["user_id"] = session.get("user_email", DEMO_USER_EMAIL)
+            payload["user_id"] = current_user.email
             scenario_id = save_scenario(payload)
             payload["_id"] = scenario_id
             
@@ -590,33 +641,80 @@ def api_scenarios():
             print(f"Error in DELETE /api/scenarios: {e}")
             return jsonify({"ok": False, "error": str(e)}), 500
 
+# ==================== ADMIN ROUTES ====================
 
-# ==================== ANALYTICS & INSIGHTS ====================
-@app.route("/api/analytics/popular-searches", methods=["GET"])
-def api_analytics_popular_searches():
-    """Get popular search terms from user history."""
-    limit = int(request.args.get("limit", 10))
+@app.route("/admin")
+@login_required
+def admin_dashboard():
+    """Admin dashboard page"""
+    if not current_user.is_admin:
+        return redirect(url_for('index'))
     
+    return render_template("admin.html", user=current_user)
+
+@app.route("/api/admin/stats", methods=["GET"])
+@admin_required
+def api_admin_stats():
+    """Get system statistics (admin only)"""
     try:
-        results = get_popular_search_terms(limit)
-        return jsonify({"ok": True, "popular_searches": results})
+        system_stats = get_system_statistics()
+        popular_towns = get_popular_towns(10)
+        popular_flat_types = get_popular_flat_types(10)
+        recent_registrations = get_recent_user_registrations(30)
+        
+        return jsonify({
+            "ok": True,
+            "system_stats": system_stats,
+            "popular_towns": popular_towns,
+            "popular_flat_types": popular_flat_types,
+            "recent_registrations": recent_registrations
+        })
     except Exception as e:
-        print(f"Error in /api/analytics/popular-searches: {e}")
+        print(f"Error in /api/admin/stats: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
-
-@app.route("/api/analytics/listings", methods=["GET"])
-def api_analytics_listings():
-    """Get listing statistics."""
+@app.route("/api/admin/users", methods=["GET"])
+@admin_required
+def api_admin_users():
+    """Get all users (admin only)"""
     try:
-        stats = get_listing_statistics()
-        return jsonify({"ok": True, "statistics": stats})
+        users = get_all_users()
+        return jsonify({"ok": True, "users": users})
     except Exception as e:
-        print(f"Error in /api/analytics/listings: {e}")
+        print(f"Error in /api/admin/users: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
+@app.route("/api/admin/users/<int:user_id>/toggle", methods=["POST"])
+@admin_required
+def api_admin_toggle_user(user_id):
+    """Activate/deactivate user (admin only)"""
+    try:
+        data = request.get_json() or {}
+        is_active = data.get("is_active", True)
+        
+        success, message = toggle_user_active_status(user_id, is_active)
+        
+        if success:
+            return jsonify({"ok": True, "message": message})
+        else:
+            return jsonify({"ok": False, "error": message}), 400
+    except Exception as e:
+        print(f"Error in /api/admin/users/{user_id}/toggle: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route("/api/admin/activity", methods=["GET"])
+@admin_required
+def api_admin_activity():
+    """Get activity summary (admin only)"""
+    try:
+        activity = get_activity_summary()
+        return jsonify({"ok": True, "activity": activity})
+    except Exception as e:
+        print(f"Error in /api/admin/activity: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 # ==================== HEALTH CHECK ====================
+
 @app.route("/api/health", methods=["GET"])
 def api_health():
     """System health check."""
@@ -639,73 +737,31 @@ def api_health():
         "status": "healthy" if (mysql_ok and mongo_ok) else "degraded",
         "timestamp": datetime.utcnow().isoformat(),
         "mysql_connected": mysql_ok,
-        "mongodb_connected": mongo_ok
+        "mongodb_connected": mongo_ok,
+        "authenticated_users": 1 if current_user.is_authenticated else 0
     })
 
-
-@app.route("/api/debug/town-metadata", methods=["GET"])
-def api_debug_town_metadata():
-    """Debug endpoint to check town metadata structure."""
-    town_name = request.args.get("town", "ANG MO KIO")
-    
-    try:
-        metadata = get_town_metadata(town_name)
-        
-        if not metadata:
-            return jsonify({
-                "ok": False,
-                "error": f"No metadata found for {town_name}",
-                "suggestion": "Check if town_metadata collection has this town"
-            })
-        
-        # Check required fields
-        has_boundary = "boundary" in metadata
-        has_geometry = "geometry" in metadata
-        has_center = "center_lat" in metadata and "center_lng" in metadata
-        
-        return jsonify({
-            "ok": True,
-            "town_name": town_name,
-            "has_boundary": has_boundary,
-            "has_geometry": has_geometry,
-            "has_center": has_center,
-            "metadata_keys": list(metadata.keys()),
-            "sample_data": {
-                "town": metadata.get("town"),
-                "region": metadata.get("region"),
-                "center_lat": metadata.get("center_lat"),
-                "center_lng": metadata.get("center_lng"),
-                "boundary_type": (
-                    metadata.get("boundary", {}).get("type")
-                    if has_boundary and isinstance(metadata.get("boundary"), dict)
-                    else None
-                ),
-                "geometry_type": (
-                    metadata.get("geometry", {}).get("type")
-                    if has_geometry and isinstance(metadata.get("geometry"), dict)
-                    else None
-                )
-            }
-        })
-    except Exception as e:
-        return jsonify({
-            "ok": False,
-            "error": str(e)
-        }), 500
-
-
 # ==================== ERROR HANDLERS ====================
+
 @app.errorhandler(404)
 def not_found(e):
     return jsonify({"ok": False, "error": "Endpoint not found"}), 404
 
+@app.errorhandler(401)
+def unauthorized(e):
+    return jsonify({"ok": False, "error": "Unauthorized - login required"}), 401
+
+@app.errorhandler(403)
+def forbidden(e):
+    return jsonify({"ok": False, "error": "Forbidden - insufficient permissions"}), 403
 
 @app.errorhandler(500)
 def server_error(e):
     return jsonify({"ok": False, "error": "Internal server error"}), 500
 
+# ==================== STARTUP ====================
 
 if __name__ == "__main__":
-    print("🚀 Starting HDB HomeFinder DB...")
+    print("🚀 Starting HDB HomeFinder DB with Authentication...")
     print(f"📍 Server running on http://0.0.0.0:5000")
     app.run(debug=True, host="0.0.0.0", port=5000)

@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block content %}
+<!-- Admin Dashboard -->
+<div class="space-y-6">
+  <!-- Welcome Header -->
+  <div class="p-6 bg-gradient-to-r from-purple-600 to-purple-500 rounded-xl text-white">
+    <h2 class="text-2xl font-bold mb-2">Admin Dashboard</h2>
+    <p class="text-purple-100">System overview and user management</p>
+  </div>
+
+  <!-- System Statistics -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="admin-stats">
+    <div class="p-4 bg-white rounded-lg border border-zinc-200 card-hover">
+      <div class="text-sm text-zinc-600 mb-1">Total Users</div>
+      <div class="text-2xl font-bold text-slate-900" id="stat-total-users">-</div>
+    </div>
+    
+    <div class="p-4 bg-white rounded-lg border border-zinc-200 card-hover">
+      <div class="text-sm text-zinc-600 mb-1">Active Users</div>
+      <div class="text-2xl font-bold text-emerald-600" id="stat-active-users">-</div>
+    </div>
+    
+    <div class="p-4 bg-white rounded-lg border border-zinc-200 card-hover">
+      <div class="text-sm text-zinc-600 mb-1">Logins (24h)</div>
+      <div class="text-2xl font-bold text-blue-600" id="stat-logins-24h">-</div>
+    </div>
+    
+    <div class="p-4 bg-white rounded-lg border border-zinc-200 card-hover">
+      <div class="text-sm text-zinc-600 mb-1">Total Activities</div>
+      <div class="text-2xl font-bold text-purple-600" id="stat-total-activities">-</div>
+    </div>
+  </div>
+
+  <!-- Popular Searches -->
+  <div class="grid md:grid-cols-2 gap-6">
+    <div class="p-6 bg-white rounded-xl border border-zinc-200 card-hover">
+      <h3 class="text-lg font-semibold mb-4 text-slate-900">Popular Towns (30 days)</h3>
+      <div id="popular-towns" class="space-y-2">
+        <p class="text-sm text-zinc-500">Loading...</p>
+      </div>
+    </div>
+    
+    <div class="p-6 bg-white rounded-xl border border-zinc-200 card-hover">
+      <h3 class="text-lg font-semibold mb-4 text-slate-900">Popular Flat Types (30 days)</h3>
+      <div id="popular-flat-types" class="space-y-2">
+        <p class="text-sm text-zinc-500">Loading...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- User Management -->
+  <div class="p-6 bg-white rounded-xl border border-zinc-200 card-hover">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold text-slate-900">User Management</h3>
+      <button id="btn-refresh-users" class="px-4 py-2 text-sm bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition">
+        Refresh
+      </button>
+    </div>
+    
+    <div id="users-loading" class="text-sm text-zinc-600 flex items-center space-x-2 py-4">
+      <div class="spinner"></div>
+      <span>Loading users...</span>
+    </div>
+    
+    <div id="users-table" class="overflow-x-auto hidden"></div>
+  </div>
+
+  <!-- Activity Summary -->
+  <div class="p-6 bg-white rounded-xl border border-zinc-200 card-hover">
+    <h3 class="text-lg font-semibold mb-4 text-slate-900">Recent Activity Summary</h3>
+    <div id="activity-summary" class="overflow-x-auto">
+      <p class="text-sm text-zinc-500">Loading...</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Load admin statistics
+async function loadAdminStats() {
+  try {
+    const response = await fetch('/api/admin/stats');
+    const data = await response.json();
+    
+    if (data.ok) {
+      const stats = data.system_stats;
+      document.getElementById('stat-total-users').textContent = stats.total_users || 0;
+      document.getElementById('stat-active-users').textContent = stats.active_users || 0;
+      document.getElementById('stat-logins-24h').textContent = stats.logins_24h || 0;
+      document.getElementById('stat-total-activities').textContent = (stats.total_activities || 0).toLocaleString();
+      
+      // Popular towns
+      const townsDiv = document.getElementById('popular-towns');
+      if (data.popular_towns && data.popular_towns.length > 0) {
+        townsDiv.innerHTML = data.popular_towns.map(t => `
+          <div class="flex justify-between items-center p-2 bg-slate-50 rounded">
+            <span class="text-sm font-medium text-slate-900">${t.town || 'Unknown'}</span>
+            <span class="text-sm text-emerald-600 font-semibold">${t.search_count} searches</span>
+          </div>
+        `).join('');
+      } else {
+        townsDiv.innerHTML = '<p class="text-sm text-zinc-500">No data available</p>';
+      }
+      
+      // Popular flat types
+      const flatTypesDiv = document.getElementById('popular-flat-types');
+      if (data.popular_flat_types && data.popular_flat_types.length > 0) {
+        flatTypesDiv.innerHTML = data.popular_flat_types.map(t => `
+          <div class="flex justify-between items-center p-2 bg-slate-50 rounded">
+            <span class="text-sm font-medium text-slate-900">${t.flat_type || 'Unknown'}</span>
+            <span class="text-sm text-blue-600 font-semibold">${t.search_count} searches</span>
+          </div>
+        `).join('');
+      } else {
+        flatTypesDiv.innerHTML = '<p class="text-sm text-zinc-500">No data available</p>';
+      }
+    }
+  } catch (error) {
+    console.error('Error loading admin stats:', error);
+  }
+}
+
+// Load users
+async function loadUsers() {
+  const loadingDiv = document.getElementById('users-loading');
+  const tableDiv = document.getElementById('users-table');
+  
+  loadingDiv.classList.remove('hidden');
+  tableDiv.classList.add('hidden');
+  
+  try {
+    const response = await fetch('/api/admin/users');
+    const data = await response.json();
+    
+    if (data.ok && data.users) {
+      const users = data.users;
+      
+      tableDiv.innerHTML = `
+        <table class="w-full text-sm">
+          <thead class="text-left text-zinc-700 border-b-2 border-zinc-300 bg-slate-100">
+            <tr>
+              <th class="py-3 px-4 font-semibold">USER</th>
+              <th class="py-3 px-4 font-semibold">STATUS</th>
+              <th class="py-3 px-4 font-semibold">ROLE</th>
+              <th class="py-3 px-4 font-semibold">REGISTERED</th>
+              <th class="py-3 px-4 font-semibold">LAST LOGIN</th>
+              <th class="py-3 px-4 font-semibold">ACTIVITIES</th>
+              <th class="py-3 px-4 font-semibold">ACTIONS</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-zinc-200">
+            ${users.map(u => `
+              <tr class="hover:bg-slate-50 transition">
+                <td class="py-3 px-4">
+                  <div class="font-medium text-slate-900">${u.full_name || 'N/A'}</div>
+                  <div class="text-xs text-zinc-600">${u.email}</div>
+                </td>
+                <td class="py-3 px-4">
+                  <span class="px-2 py-1 text-xs rounded-full ${u.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">
+                    ${u.is_active ? 'Active' : 'Inactive'}
+                  </span>
+                </td>
+                <td class="py-3 px-4">
+                  <span class="px-2 py-1 text-xs rounded-full ${u.is_admin ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}">
+                    ${u.is_admin ? 'Admin' : 'User'}
+                  </span>
+                </td>
+                <td class="py-3 px-4 text-zinc-700">
+                  ${new Date(u.created_at).toLocaleDateString()}
+                </td>
+                <td class="py-3 px-4 text-zinc-700">
+                  ${u.last_login ? new Date(u.last_login).toLocaleDateString() : 'Never'}
+                </td>
+                <td class="py-3 px-4 text-zinc-700">
+                  ${u.total_activities || 0}
+                </td>
+                <td class="py-3 px-4">
+                  ${!u.is_admin ? `
+                    <button 
+                      onclick="toggleUserStatus(${u.user_id}, ${!u.is_active})"
+                      class="px-3 py-1 text-xs ${u.is_active ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200'} rounded transition"
+                    >
+                      ${u.is_active ? 'Deactivate' : 'Activate'}
+                    </button>
+                  ` : '<span class="text-xs text-zinc-400">Protected</span>'}
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+      
+      tableDiv.classList.remove('hidden');
+    }
+  } catch (error) {
+    console.error('Error loading users:', error);
+    tableDiv.innerHTML = '<p class="text-sm text-red-600 p-4">Error loading users</p>';
+    tableDiv.classList.remove('hidden');
+  } finally {
+    loadingDiv.classList.add('hidden');
+  }
+}
+
+// Toggle user status
+async function toggleUserStatus(userId, isActive) {
+  if (!confirm(`Are you sure you want to ${isActive ? 'activate' : 'deactivate'} this user?`)) {
+    return;
+  }
+  
+  try {
+    const response = await fetch(`/api/admin/users/${userId}/toggle`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ is_active: isActive }),
+    });
+    
+    const data = await response.json();
+    
+    if (data.ok) {
+      alert('User status updated successfully');
+      loadUsers();
+    } else {
+      alert('Error: ' + (data.error || 'Failed to update user status'));
+    }
+  } catch (error) {
+    console.error('Error toggling user status:', error);
+    alert('Network error');
+  }
+}
+
+// Load activity summary
+async function loadActivitySummary() {
+  try {
+    const response = await fetch('/api/admin/activity');
+    const data = await response.json();
+    
+    if (data.ok && data.activity) {
+      const summaryDiv = document.getElementById('activity-summary');
+      
+      if (data.activity.length === 0) {
+        summaryDiv.innerHTML = '<p class="text-sm text-zinc-500">No recent activity</p>';
+        return;
+      }
+      
+      const activityByDate = {};
+      data.activity.forEach(a => {
+        const date = a.activity_date;
+        if (!activityByDate[date]) {
+          activityByDate[date] = [];
+        }
+        activityByDate[date].push(a);
+      });
+      
+      summaryDiv.innerHTML = Object.keys(activityByDate).slice(0, 7).map(date => `
+        <div class="mb-4 p-4 bg-slate-50 rounded-lg">
+          <div class="font-semibold text-slate-900 mb-2">${new Date(date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+            ${activityByDate[date].map(a => `
+              <div class="p-2 bg-white rounded border border-zinc-200">
+                <div class="text-xs text-zinc-600">${a.activity_type}</div>
+                <div class="text-sm font-semibold text-slate-900">${a.total_count} actions</div>
+                <div class="text-xs text-zinc-500">${a.unique_users} users</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `).join('');
+    }
+  } catch (error) {
+    console.error('Error loading activity summary:', error);
+  }
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+  loadAdminStats();
+  loadUsers();
+  loadActivitySummary();
+  
+  // Refresh button
+  document.getElementById('btn-refresh-users').addEventListener('click', loadUsers);
+});
+</script>
+{% endblock %}
