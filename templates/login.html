@@ -18,12 +18,15 @@
     <div class="max-w-md w-full">
       <!-- Logo and Header -->
       <div class="text-center mb-8">
-        <div class="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 via-emerald-600 to-emerald-700 shadow-lg flex items-center justify-center mb-4">
-          <svg class="w-9 h-9 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l9-9 9 9" />
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10v9a1 1 0 001 1h4v-4a1 1 0 011-1h2a1 1 0 011 1v4h4a1 1 0 001-1v-9" />
-          </svg>
-        </div>
+        <a href="/" 
+            title="Go to Home"
+            class="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 via-emerald-600 to-emerald-700 shadow-lg flex items-center justify-center mb-4 hover:opacity-90 transition" aria-label="Home" title="Home">
+            <svg class="w-9 h-9 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l9-9 9 9" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10v9a1 1 0 001 1h4v-4a1 1 0 011-1h2a1 1 0 011 1v4h4a1 1 0 001-1v-9" />
+            </svg>
+            <span class="sr-only">Home</span>
+        </a>
         <h2 class="text-3xl font-bold text-white">
           Welcome Back
         </h2>
