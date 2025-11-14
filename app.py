@@ -346,7 +346,6 @@ def api_search_trends():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 @app.route("/api/search/transactions", methods=["POST"])
-@login_required  # Require login for transaction searches
 def api_search_transactions():
     """Get recent transactions with details."""
     payload = request.get_json() or {}
@@ -357,26 +356,27 @@ def api_search_transactions():
     try:
         transactions = query_transactions(town, flat_type, limit)
         
-        # Log activity
-        log_user_activity(current_user.id, 'search', {
-            "town": town,
-            "flat_type": flat_type,
-            "type": "transactions"
-        })
-        
-        add_search_to_history(current_user.email, {
-            "town": town,
-            "flat_type": flat_type,
-            "type": "transactions"
-        }, len(transactions))
+        # Log activity ONLY if user is authenticated
+        if current_user.is_authenticated:  # ← ADD THIS CHECK
+            log_user_activity(current_user.id, 'search', {
+                "town": town,
+                "flat_type": flat_type,
+                "type": "transactions"
+            })
+            
+            add_search_to_history(current_user.email, {
+                "town": town,
+                "flat_type": flat_type,
+                "type": "transactions"
+            }, len(transactions))
         
         return jsonify({"ok": True, "transactions": transactions, "count": len(transactions)})
     except Exception as e:
         print(f"Error in /api/search/transactions: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
+
 @app.route("/api/compare/towns", methods=["POST"])
-@login_required  # Require login for comparisons
 def api_compare_towns():
     """Compare multiple towns with integrated data."""
     payload = request.get_json() or {}
@@ -433,11 +433,12 @@ def api_compare_towns():
             town_data['mrt_count'] = 2
             town_data['school_count'] = 5
         
-        # Log activity
-        log_user_activity(current_user.id, 'comparison', {
-            "towns": towns_list,
-            "flat_type": flat_type
-        })
+        # Log activity (only if logged in)
+        if current_user.is_authenticated:
+            log_user_activity(current_user.id, 'comparison', {
+                "towns": towns_list,
+                "flat_type": flat_type
+            })
         
         return jsonify({
             "ok": True, 
@@ -450,7 +451,6 @@ def api_compare_towns():
 # ==================== AFFORDABILITY (WITH LOGGING) ====================
 
 @app.route("/api/affordability", methods=["POST"])
-@login_required
 def api_affordability():
     """Calculate affordability with enhanced mortgage rules and rates"""
     payload = request.get_json() or {}
@@ -467,12 +467,13 @@ def api_affordability():
             use_current_rates=True
         )
         
-        # Log activity
-        log_user_activity(current_user.id, 'affordability_calc', {
-            "income": income,
-            "expenses": expenses,
-            "affordable": result.get("affordable")
-        })
+        # Log activity (only if logged in)
+        if current_user.is_authenticated:
+            log_user_activity(current_user.id, 'affordability_calc', {
+                "income": income,
+                "expenses": expenses,
+                "affordable": result.get("affordable")
+            })
         
         expenditure_data = get_household_expenditure_latest()
         housing_expense = next((e for e in expenditure_data if "Housing" in e["category"]), None)
@@ -539,7 +540,6 @@ def api_amenities():
 # ==================== LISTING REMARKS SEARCH ====================
 
 @app.route("/api/listings/search", methods=["POST"])
-@login_required
 def api_listings_search():
     """Full-text search on listing remarks."""
     payload = request.get_json() or {}
@@ -554,13 +554,14 @@ def api_listings_search():
         else:
             results = search_listing_remarks(query, town, flat_type, limit)
         
-        # Log activity
-        log_user_activity(current_user.id, 'search', {
-            "query": query,
-            "town": town,
-            "flat_type": flat_type,
-            "type": "listings"
-        })
+        # Log activity (only if logged in)
+        if current_user.is_authenticated:
+            log_user_activity(current_user.id, 'search', {
+                "query": query,
+                "town": town,
+                "flat_type": flat_type,
+                "type": "listings"
+            })
         
         return jsonify({
             "ok": True,
@@ -600,13 +601,19 @@ def api_user_add_favorite():
 # ==================== SCENARIOS ====================
 
 @app.route("/api/scenarios", methods=["GET", "POST", "DELETE"])
-@login_required
 def api_scenarios():
-    """Manage affordability scenarios in MongoDB."""
+    """Manage affordability scenarios - works for guests and logged-in users."""
     
     if request.method == "GET":
+        # Support both authenticated and guest users
+        if current_user.is_authenticated:
+            user_email = current_user.email
+        else:
+            # Use session ID for guest users
+            user_email = session.get("guest_id", f"guest_{session.sid}")
+        
         try:
-            scenarios = list_scenarios(current_user.email)
+            scenarios = list_scenarios(user_email)
             return jsonify({"ok": True, "items": scenarios})
         except Exception as e:
             print(f"Error in GET /api/scenarios: {e}")
@@ -620,7 +627,20 @@ def api_scenarios():
         
         try:
             payload["created_at"] = datetime.utcnow()
-            payload["user_id"] = current_user.email
+            
+            # Use authenticated user email or guest session ID
+            if current_user.is_authenticated:
+                payload["user_id"] = current_user.email
+                payload["is_guest"] = False
+            else:
+                # Allow guests to save scenarios (tied to session)
+                guest_id = session.get("guest_id")
+                if not guest_id:
+                    guest_id = f"guest_{session.sid}"
+                    session["guest_id"] = guest_id
+                payload["user_id"] = guest_id
+                payload["is_guest"] = True
+            
             scenario_id = save_scenario(payload)
             payload["_id"] = scenario_id
             
@@ -640,6 +660,7 @@ def api_scenarios():
         except Exception as e:
             print(f"Error in DELETE /api/scenarios: {e}")
             return jsonify({"ok": False, "error": str(e)}), 500
+
 
 # ==================== ADMIN ROUTES ====================
 
