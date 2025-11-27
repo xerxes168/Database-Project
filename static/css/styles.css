@@ -1,4 +1,331 @@
-/* static/css/styles.css */
+/* static/css/styles.css - UPDATED WITH ACCESS CONTROL STYLES */
+
+/* ========== EXISTING STYLES ========== */
 .ui-tab.active {
   outline: 2px solid rgb(34 197 94); /* emerald-500 */
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.3);
+  color: white;
+}
+
+/* ========== RESTRICTED TAB STYLING ========== */
+.ui-tab[data-tab="affordability"] {
+  position: relative;
+}
+
+.ui-tab[data-tab="affordability"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ui-tab[data-tab="affordability"].restricted {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ui-tab[data-tab="affordability"].restricted::after {
+  content: '🔒';
+  margin-left: 0.5rem;
+  font-size: 0.875rem;
+}
+
+/* ========== PANEL BLOCKER STYLES ========== */
+.restricted-panel-blocker {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(4px);
+  border-radius: 12px;
+  z-index: 50;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.1);
+}
+
+.restricted-panel-blocker.active {
+  display: flex;
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ========== BLOCKER CONTENT ========== */
+.blocker-content {
+  text-align: center;
+  max-width: 400px;
+  animation: scaleIn 0.4s ease-out;
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.blocker-icon {
+  color: #dc2626;
+  margin-bottom: 1rem;
+  display: flex;
+  justify-content: center;
+  animation: bounce 1s ease-out;
+}
+
+.blocker-icon svg {
+  width: 4rem;
+  height: 4rem;
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.blocker-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #18181b;
+  margin-bottom: 0.5rem;
+}
+
+.blocker-message {
+  font-size: 0.95rem;
+  color: #52525b;
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
+}
+
+/* ========== BLOCKER ACTIONS ========== */
+.blocker-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.blocker-btn {
+  padding: 0.625rem 1.25rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  display: inline-block;
+  cursor: pointer;
+  border: none;
+  outline: none;
+}
+
+.blocker-btn:focus {
+  outline: 2px solid #059669;
+  outline-offset: 2px;
+}
+
+.blocker-btn-primary {
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  color: white;
+  box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.3);
+}
+
+.blocker-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.4);
+}
+
+.blocker-btn-primary:active {
+  transform: translateY(0);
+}
+
+.blocker-btn-secondary {
+  background: white;
+  color: #059669;
+  border: 2px solid #059669;
+}
+
+.blocker-btn-secondary:hover {
+  background: #f0fdf4;
+  color: #047857;
+  border-color: #047857;
+}
+
+.blocker-btn-secondary:active {
+  background: #dcfce7;
+}
+
+/* ========== TAB ICON ENHANCEMENT ========== */
+.ui-tab {
+  transition: all 0.3s ease;
+}
+
+.ui-tab:hover:not(.restricted) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.ui-tab.restricted {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ui-tab.restricted:hover {
+  transform: none;
+}
+
+/* ========== AFFORDABILITY PANEL SPECIFIC ========== */
+#panel-affordability {
+  position: relative;
+}
+
+#panel-affordability.restricted-access {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+/* ========== RESPONSIVE BLOCKER ========== */
+@media (max-width: 640px) {
+  .restricted-panel-blocker {
+    padding: 1.5rem;
+  }
+
+  .blocker-content {
+    max-width: 100%;
+  }
+
+  .blocker-title {
+    font-size: 1.25rem;
+  }
+
+  .blocker-message {
+    font-size: 0.875rem;
+  }
+
+  .blocker-actions {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .blocker-btn {
+    width: 100%;
+  }
+}
+
+/* ========== ACCESSIBILITY ========== */
+.ui-tab:focus-visible {
+  outline: 3px solid #10b981;
+  outline-offset: 2px;
+}
+
+.blocker-btn:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .restricted-panel-blocker.active {
+    animation: none;
+  }
+
+  .blocker-content {
+    animation: none;
+  }
+
+  .blocker-icon {
+    animation: none;
+  }
+
+  .ui-tab:hover:not(.restricted) {
+    transform: none;
+  }
+
+  .blocker-btn-primary:hover {
+    transform: none;
+  }
+}
+
+/* ========== DARK MODE SUPPORT (optional) ========== */
+@media (prefers-color-scheme: dark) {
+  .restricted-panel-blocker {
+    background: rgba(24, 24, 27, 0.98);
+  }
+
+  .blocker-title {
+    color: #f4f4f5;
+  }
+
+  .blocker-message {
+    color: #d4d4d8;
+  }
+
+  .blocker-btn-secondary {
+    background: #18181b;
+    color: #10b981;
+  }
+
+  .blocker-btn-secondary:hover {
+    background: #27272a;
+  }
+}
+
+/* ========== LOADING STATE ========== */
+.spinner {
+  border: 3px solid rgba(16, 185, 129, 0.1);
+  border-top-color: #10b981;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ========== UTILITY CLASSES ========== */
+.opacity-50 {
+  opacity: 0.5;
+}
+
+.cursor-not-allowed {
+  cursor: not-allowed;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

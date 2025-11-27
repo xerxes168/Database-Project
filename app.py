@@ -5,6 +5,7 @@ from werkzeug.utils import secure_filename
 import os, json
 from datetime import datetime
 from pymongo import MongoClient
+from functools import wraps
 
 # Database imports
 from db_mysql import (
@@ -167,19 +168,49 @@ def api_logout():
     return jsonify({"ok": True, "message": "Logged out successfully"})
 
 @app.route("/api/auth/me", methods=["GET"])
-@login_required
 def api_current_user():
-    """Get current user info"""
-    return jsonify({
-        "ok": True,
-        "user": {
-            "id": current_user.id,
-            "email": current_user.email,
-            "full_name": current_user.full_name,
-            "is_admin": current_user.is_admin,
-            "is_active": current_user.is_active
-        }
-    })
+    """
+    Get current user info or return unauthenticated status
+    This endpoint works for both authenticated and unauthenticated users
+    """
+    if current_user.is_authenticated:
+        # User is logged in
+        return jsonify({
+            "ok": True,
+            "authenticated": True,
+            "user": {
+                "id": current_user.id,
+                "email": current_user.email,
+                "full_name": current_user.full_name,
+                "is_admin": current_user.is_admin,
+                "is_active": current_user.is_active
+            }
+        }), 200
+    else:
+        # User is not authenticated
+        return jsonify({
+            "ok": False,
+            "authenticated": False,
+            "user": None
+        }), 401
+    
+# ========== ADDITIONAL HELPER FUNCTION FOR PROTECTED API ROUTES ==========
+
+def require_auth(f):
+    """
+    Decorator to require authentication for API endpoints
+    Returns 401 if user is not authenticated
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return jsonify({
+                "ok": False,
+                "error": "Authentication required",
+                "authenticated": False
+            }), 401
+        return f(*args, **kwargs)
+    return decorated_function
 
 @app.route("/api/auth/change-password", methods=["POST"])
 @login_required
@@ -451,8 +482,12 @@ def api_compare_towns():
 # ==================== AFFORDABILITY (WITH LOGGING) ====================
 
 @app.route("/api/affordability", methods=["POST"])
+@require_auth 
 def api_affordability():
-    """Calculate affordability with enhanced mortgage rules and rates"""
+    """
+    Calculate affordability with enhanced mortgage rules and rates
+    RESTRICTED: Only authenticated users can access this
+    """
     payload = request.get_json() or {}
     
     try:
@@ -467,13 +502,12 @@ def api_affordability():
             use_current_rates=True
         )
         
-        # Log activity (only if logged in)
-        if current_user.is_authenticated:
-            log_user_activity(current_user.id, 'affordability_calc', {
-                "income": income,
-                "expenses": expenses,
-                "affordable": result.get("affordable")
-            })
+        # Log activity (user is guaranteed to be authenticated)
+        log_user_activity(current_user.id, 'affordability_calc', {
+            "income": income,
+            "expenses": expenses,
+            "affordable": result.get("affordable")
+        })
         
         expenditure_data = get_household_expenditure_latest()
         housing_expense = next((e for e in expenditure_data if "Housing" in e["category"]), None)
@@ -487,13 +521,22 @@ def api_affordability():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 @app.route("/api/affordability/context", methods=["GET"])
+@require_auth 
 def api_affordability_context():
-    """Get context data for affordability calculator"""
+    """
+    Get context data for affordability calculator
+    RESTRICTED: Only authenticated users can access this
+    """
     try:
         current_rate = get_current_mortgage_rate()
         loan_rules = get_current_loan_rules()
         income_data = get_latest_household_income()
         expenditure_data = get_household_expenditure_latest()
+        
+        # Log access
+        log_user_activity(current_user.id, 'affordability_context', {
+            "action": "view_context"
+        })
         
         return jsonify({
             "ok": True,
@@ -602,18 +645,32 @@ def api_user_add_favorite():
 
 @app.route("/api/scenarios", methods=["GET", "POST", "DELETE"])
 def api_scenarios():
-    """Manage affordability scenarios - works for guests and logged-in users."""
+    """
+    Manage affordability scenarios
+    
+    GET: List scenarios for current user (auth required)
+    POST: Create scenario (auth required)
+    DELETE: Delete scenario (auth required)
+    """
+    
+    # RESTRICT ALL OPERATIONS TO AUTHENTICATED USERS
+    if not current_user.is_authenticated:
+        return jsonify({
+            "ok": False,
+            "error": "Authentication required to manage scenarios",
+            "authenticated": False
+        }), 401
     
     if request.method == "GET":
-        # Support both authenticated and guest users
-        if current_user.is_authenticated:
-            user_email = current_user.email
-        else:
-            # Use session ID for guest users
-            user_email = session.get("guest_id", f"guest_{session.sid}")
-        
         try:
+            user_email = current_user.email
             scenarios = list_scenarios(user_email)
+            
+            # Log activity
+            log_user_activity(current_user.id, 'view_scenarios', {
+                "count": len(scenarios)
+            })
+            
             return jsonify({"ok": True, "items": scenarios})
         except Exception as e:
             print(f"Error in GET /api/scenarios: {e}")
@@ -627,22 +684,17 @@ def api_scenarios():
         
         try:
             payload["created_at"] = datetime.utcnow()
-            
-            # Use authenticated user email or guest session ID
-            if current_user.is_authenticated:
-                payload["user_id"] = current_user.email
-                payload["is_guest"] = False
-            else:
-                # Allow guests to save scenarios (tied to session)
-                guest_id = session.get("guest_id")
-                if not guest_id:
-                    guest_id = f"guest_{session.sid}"
-                    session["guest_id"] = guest_id
-                payload["user_id"] = guest_id
-                payload["is_guest"] = True
+            payload["user_id"] = current_user.email
+            payload["is_guest"] = False
             
             scenario_id = save_scenario(payload)
             payload["_id"] = scenario_id
+            
+            # Log activity
+            log_user_activity(current_user.id, 'create_scenario', {
+                "scenario_id": scenario_id,
+                "name": payload.get("name")
+            })
             
             return jsonify({"ok": True, "item": payload})
         except Exception as e:
@@ -655,7 +707,21 @@ def api_scenarios():
             return jsonify({"ok": False, "error": "No ID provided"}), 400
         
         try:
+            # Verify ownership before deleting
+            scenario = get_scenario(scenario_id)
+            if not scenario:
+                return jsonify({"ok": False, "error": "Scenario not found"}), 404
+            
+            if scenario.get("user_id") != current_user.email:
+                return jsonify({"ok": False, "error": "Unauthorized"}), 403
+            
             delete_scenario(scenario_id)
+            
+            # Log activity
+            log_user_activity(current_user.id, 'delete_scenario', {
+                "scenario_id": scenario_id
+            })
+            
             return jsonify({"ok": True, "deleted": scenario_id})
         except Exception as e:
             print(f"Error in DELETE /api/scenarios: {e}")
