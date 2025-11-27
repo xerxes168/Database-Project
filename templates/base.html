@@ -268,14 +268,12 @@
               </svg>
             </button>
 
-            {% if current_user.is_authenticated %}
             <!-- Affordability icon -->
             <button class="w-10 h-10 rounded-full bg-white text-slate-500 hover:bg-slate-100 flex items-center justify-center shadow-sm transition" data-panel-target="affordability">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
               </svg>
             </button>
-            {% endif %}
 
           </div>
         </div>
@@ -299,49 +297,66 @@
 
             <!-- Transactions panel -->
             <section id="panel-transactions" data-panel="transactions" class="space-y-4 hidden">
-              <div class="grid lg:grid-cols-5 gap-6">
-                <div class="lg:col-span-2 space-y-4">
-                  <div class="p-6 bg-white rounded-xl border border-zinc-200 card-hover">
-                    <h2 class="text-lg font-semibold mb-4 text-slate-900">Filters</h2>
-                    
-                    <div class="space-y-4">
-                      <div>
-                        <label class="block text-sm font-medium mb-2 text-zinc-700">Town</label>
-                        <select title="Select Town" id="trans-town" class="w-full bg-slate-100 border border-slate-300 text-slate-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
-                          <option>Loading...</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label class="block text-sm font-medium mb-2 text-zinc-700">Flat Type</label>
-                        <select title="Select Flat Type" id="trans-flat" class="w-full bg-slate-100 border border-slate-300 text-slate-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
-                          <option>Loading...</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label class="block text-sm font-medium mb-2 text-zinc-700">Results Limit</label>
-                        <input title="Select Results Limit" id="trans-limit" type="number" value="20" min="5" max="100" class="w-full bg-slate-100 border border-slate-300 text-slate-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
-                      </div>
-
-                      <button id="btn-search-trans" class="w-full py-3 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 font-medium transition-all text-white">
-                        Search Transactions
-                      </button>
+              <div class="relative">
+                {% if not current_user.is_authenticated %}
+                  <div class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm rounded-xl">
+                    <h3 class="text-base font-semibold text-slate-900 mb-2">Login required</h3>
+                    <p class="text-xs text-slate-600 mb-4 text-center max-w-xs">
+                      Please log in or sign up to view recent resale transactions.
+                    </p>
+                    <div class="flex gap-3">
+                      <a href="/login" class="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-500">Log in</a>
+                      <a href="/register" class="px-4 py-2 rounded-lg border border-emerald-600 text-emerald-700 text-sm font-medium bg-white hover:bg-emerald-50">Sign up</a>
                     </div>
                   </div>
-                </div>
+                {% endif %}
 
-                <div class="lg:col-span-3">
-                  <div class="p-6 bg-white rounded-xl border border-zinc-200 card-hover">
-                    <div class="flex items-center justify-between mb-4">
-                      <h3 class="text-lg font-semibold text-slate-900">Recent Resale Transactions</h3>
-                      <div id="trans-count" class="text-sm text-zinc-600 font-medium">0 results</div>
+                <div class="{% if not current_user.is_authenticated %}pointer-events-none opacity-40{% endif %}">
+                  <div class="grid lg:grid-cols-5 gap-6">
+                    <div class="lg:col-span-2 space-y-4">
+                      <div class="p-6 bg-white rounded-xl border border-zinc-200 card-hover">
+                        <h2 class="text-lg font-semibold mb-4 text-slate-900">Filters</h2>
+
+                        <div class="space-y-4">
+                          <div>
+                            <label class="block text-sm font-medium mb-2 text-zinc-700">Town</label>
+                            <select title="Select Town" id="trans-town" class="w-full bg-slate-100 border border-slate-300 text-slate-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                              <option>Loading...</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label class="block text-sm font-medium mb-2 text-zinc-700">Flat Type</label>
+                            <select title="Select Flat Type" id="trans-flat" class="w-full bg-slate-100 border border-slate-300 text-slate-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                              <option>Loading...</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label class="block text-sm font-medium mb-2 text-zinc-700">Results Limit</label>
+                            <input title="Select Results Limit" id="trans-limit" type="number" value="20" min="5" max="100" class="w-full bg-slate-100 border border-slate-300 text-slate-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                          </div>
+
+                          <button id="btn-search-trans" class="w-full py-3 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 font-medium transition-all text-white">
+                            Search Transactions
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                    <div id="trans-loading" class="hidden text-sm text-zinc-600 flex items-center space-x-2">
-                      <div class="spinner"></div>
-                      <span>Loading transactions...</span>
+
+                    <div class="lg:col-span-3">
+                      <div class="p-6 bg-white rounded-xl border border-zinc-200 card-hover">
+                        <div class="flex items-center justify-between mb-4">
+                          <h3 class="text-lg font-semibold text-slate-900">Recent Resale Transactions</h3>
+                          <div id="trans-count" class="text-sm text-zinc-600 font-medium">0 results</div>
+                        </div>
+                        <div id="trans-loading" class="hidden text-sm text-zinc-600 flex items-center space-x-2">
+                          <div class="spinner"></div>
+                          <span>Loading transactions...</span>
+                        </div>
+                        <div id="trans-list" class="space-y-3"></div>
+                      </div>
                     </div>
-                    <div id="trans-list" class="space-y-3"></div>
                   </div>
                 </div>
               </div>
@@ -349,73 +364,89 @@
 
             <!-- Affordability panel -->
             <section id="panel-affordability" data-panel="affordability" class="space-y-4 hidden">
-              <div class="grid lg:grid-cols-4 gap-6">
-                <!-- Calculator Input -->
-                <div class="lg:col-span-2 space-y-4">
-                  <div class="p-6 bg-white rounded-xl border border-zinc-200 card-hover">
-                    <h2 class="text-lg font-semibold mb-4 flex items-center space-x-2 text-slate-900">
-                      <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
-                      </svg>
-                      <span>Calculator</span>
-                    </h2>
-                    
-                    <div class="space-y-4">
-                      <div>
-                        <label class="block text-sm font-medium mb-2 text-zinc-700">Monthly Household Income (SGD)</label>
-                        <input id="af-income" type="number" class="w-full bg-slate-100 border border-slate-300 text-slate-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent" placeholder="e.g., 9500" value="9500">
-                      </div>
-
-                      <div>
-                        <label class="block text-sm font-medium mb-2 text-zinc-700">Monthly Expenses (SGD)</label>
-                        <input id="af-expenses" type="number" class="w-full bg-slate-100 border border-slate-300 text-slate-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent" placeholder="e.g., 2500" value="2500">
-                      </div>
-
-                      <div class="grid grid-cols-2 gap-3">
-                        <div>
-                          <label class="block text-sm font-medium mb-2 text-zinc-700">Interest Rate (%)</label>
-                          <input title="Enter Interest Rate" id="af-interest" type="number" step="0.1" class="w-full bg-slate-100 border border-slate-300 text-slate-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent" value="2.6">
-                        </div>
-                        <div>
-                          <label class="block text-sm font-medium mb-2 text-zinc-700">Tenure (years)</label>
-                          <input title="Enter Tenure in Years" id="af-tenure" type="number" class="w-full bg-slate-100 border border-slate-300 text-slate-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent" value="25">
-                        </div>
-                      </div>
-
-                      <div>
-                        <label class="block text-sm font-medium mb-2 text-zinc-700">Down Payment (%)</label>
-                        <input title="Enter Down Payment Percentage" id="af-downpayment" type="number" step="1" class="w-full bg-slate-100 border border-slate-300 text-slate-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent" value="20">
-                      </div>
-
-                      <button id="btn-afford" class="mt-6 w-full py-3 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 font-medium transition-all shadow-lg shadow-emerald-500/30 text-white">
-                        Calculate Affordability
-                      </button>
-                      
-                      <div class="p-3 bg-slate-100 rounded-lg border border-slate-200">
-                        <p class="text-xs text-zinc-700 leading-relaxed">
-                          Uses mortgage calculation rules and 30% income threshold for affordability analysis.
-                        </p>
-                      </div>
+              <div class="relative">
+                {% if not current_user.is_authenticated %}
+                  <div class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm rounded-xl">
+                    <h3 class="text-base font-semibold text-slate-900 mb-2">Login required</h3>
+                    <p class="text-xs text-slate-600 mb-4 text-center max-w-xs">
+                      Please log in or sign up to use the affordability calculator.
+                    </p>
+                    <div class="flex gap-3">
+                      <a href="/login" class="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-500">Log in</a>
+                      <a href="/register" class="px-4 py-2 rounded-lg border border-emerald-600 text-emerald-700 text-sm font-medium bg-white hover:bg-emerald-50">Sign up</a>
                     </div>
                   </div>
-                </div>
+                {% endif %}
+                <div class="{% if not current_user.is_authenticated %}pointer-events-none opacity-40{% endif %}">
+                  <div class="grid lg:grid-cols-4 gap-6">
+                    <!-- Calculator Input -->
+                    <div class="lg:col-span-2 space-y-4">
+                      <div class="p-6 bg-white rounded-xl border border-zinc-200 card-hover">
+                        <h2 class="text-lg font-semibold mb-4 flex items-center space-x-2 text-slate-900">
+                          <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                          </svg>
+                          <span>Calculator</span>
+                        </h2>
+                        
+                        <div class="space-y-4">
+                          <div>
+                            <label class="block text-sm font-medium mb-2 text-zinc-700">Monthly Household Income (SGD)</label>
+                            <input id="af-income" type="number" class="w-full bg-slate-100 border border-slate-300 text-slate-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent" placeholder="e.g., 9500" value="9500">
+                          </div>
 
-                <!-- Results & Scenarios -->
-                <div class="lg:col-span-2 space-y-4">
-                  <!-- Results Card -->
-                  <div class="p-6 bg-white rounded-xl border border-zinc-200 card-hover">
-                    <h3 class="text-lg font-semibold mb-4 text-slate-900">Affordability Results</h3>
-                    <div id="af-result" class="space-y-4">
-                      <div class="text-center text-zinc-500 py-8">
-                        <svg class="w-16 h-16 mx-auto mb-3 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
-                        </svg>
-                        <p class="text-sm">Enter your details and click Calculate</p>
+                          <div>
+                            <label class="block text-sm font-medium mb-2 text-zinc-700">Monthly Expenses (SGD)</label>
+                            <input id="af-expenses" type="number" class="w-full bg-slate-100 border border-slate-300 text-slate-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent" placeholder="e.g., 2500" value="2500">
+                          </div>
+
+                          <div class="grid grid-cols-2 gap-3">
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-zinc-700">Interest Rate (%)</label>
+                              <input title="Enter Interest Rate" id="af-interest" type="number" step="0.1" class="w-full bg-slate-100 border border-slate-300 text-slate-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent" value="2.6">
+                            </div>
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-zinc-700">Tenure (years)</label>
+                              <input title="Enter Tenure in Years" id="af-tenure" type="number" class="w-full bg-slate-100 border border-slate-300 text-slate-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent" value="25">
+                            </div>
+                          </div>
+
+                          <div>
+                            <label class="block text-sm font-medium mb-2 text-zinc-700">Down Payment (%)</label>
+                            <input title="Enter Down Payment Percentage" id="af-downpayment" type="number" step="1" class="w-full bg-slate-100 border border-slate-300 text-slate-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent" value="20">
+                          </div>
+
+                          <button id="btn-afford" class="mt-6 w-full py-3 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 font-medium transition-all shadow-lg shadow-emerald-500/30 text-white">
+                            Calculate Affordability
+                          </button>
+                          
+                          <div class="p-3 bg-slate-100 rounded-lg border border-slate-200">
+                            <p class="text-xs text-zinc-700 leading-relaxed">
+                              Uses mortgage calculation rules and 30% income threshold for affordability analysis.
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
-              </div>
+
+                    <!-- Results & Scenarios -->
+                    <div class="lg:col-span-2 space-y-4">
+                      <!-- Results Card -->
+                      <div class="p-6 bg-white rounded-xl border border-zinc-200 card-hover">
+                        <h3 class="text-lg font-semibold mb-4 text-slate-900">Affordability Results</h3>
+                        <div id="af-result" class="space-y-4">
+                          <div class="text-center text-zinc-500 py-8">
+                            <svg class="w-16 h-16 mx-auto mb-3 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                            </svg>
+                            <p class="text-sm">Enter your details and click Calculate</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div> <!-- end grid -->
+                </div> <!-- end dimmed wrapper -->
+              </div> <!-- end relative -->
             </section>
 
 
@@ -545,7 +576,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const data = await response.json();
         
         if (data.ok) {
-          window.location.href = '/login';
+          window.location.href = '/';
         }
       } catch (error) {
         console.error('Logout error:', error);

@@ -485,7 +485,7 @@ def api_compare_towns():
 # ==================== AFFORDABILITY (WITH LOGGING) ====================
 
 @app.route("/api/affordability", methods=["POST"])
-@require_auth 
+@login_required
 def api_affordability():
     """
     Calculate affordability with enhanced mortgage rules and rates
