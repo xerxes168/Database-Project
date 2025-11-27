@@ -343,6 +343,7 @@ def api_meta():
 # ==================== SQL QUERIES (WITH ACTIVITY LOGGING) ====================
 
 @app.route("/api/search/trends", methods=["POST"])
+@login_required
 def api_search_trends():
     """Advanced SQL query with window functions - Price trends analysis."""
     payload = request.get_json() or {}
@@ -377,6 +378,7 @@ def api_search_trends():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 @app.route("/api/search/transactions", methods=["POST"])
+@login_required
 def api_search_transactions():
     """Get recent transactions with details."""
     payload = request.get_json() or {}
@@ -408,6 +410,7 @@ def api_search_transactions():
 
 
 @app.route("/api/compare/towns", methods=["POST"])
+@login_required
 def api_compare_towns():
     """Compare multiple towns with integrated data."""
     payload = request.get_json() or {}

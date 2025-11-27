@@ -589,9 +589,7 @@ function showListingsOnMap(listings) {
       </div>
     `;
 
-    const remarksPreview = listing.remarks && listing.remarks.length > 150
-      ? listing.remarks.substring(0, 150) + "..."
-      : listing.remarks || "No description";
+    const remarksText = listing.remarks || "No description";
 
     const marker = new mapboxgl.Marker(el)
       .setLngLat([lng, lat])
@@ -644,8 +642,8 @@ function showListingsOnMap(listings) {
             Approx. recent range: <span style="font-weight:600;">${priceRange.label}</span>
           </div>` : ``}
           ` : ``}
-          <div style="font-size: 12px; color: #3f3f46; line-height: 1.5; margin-bottom: 8px;">
-            ${remarksPreview}
+          <div style="font-size: 12px; color: #3f3f46; line-height: 1.5; margin-bottom: 8px; max-height: 120px; overflow-y: auto; padding-right: 4px; white-space: pre-line;">
+            ${remarksText}
           </div>
           <div style="font-size: 11px; color: #71717a; border-top: 1px solid #e5e7eb; padding-top: 6px; margin-top: 6px;">
             📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}
@@ -1227,9 +1225,9 @@ async function setupListingsPanel() {
           if (resultsDiv) {
             resultsDiv.innerHTML = res.results.map(listing => {
               let remarksPreview = listing.remarks || 'No description';
-              if (remarksPreview.length > 250) {
-                remarksPreview = remarksPreview.substring(0, 250) + '...';
-              }
+              // if (remarksPreview.length > 250) {
+              //   remarksPreview = remarksPreview.substring(0, 250) + '...';
+              // }
               
               return `
                 <div class="p-4 bg-white rounded-lg border border-zinc-300 hover:border-emerald-500 transition cursor-pointer listing-card"
@@ -1326,7 +1324,7 @@ async function setupListingsPanel() {
                       Approx. recent range: <span style="font-weight:600;">${priceRange.label}</span>
                     </div>` : ``}
                     ` : ``}
-                    ${remarks ? `<div style="font-size: 12px; color: #3f3f46; line-height: 1.5; margin-bottom: 8px;">${remarks}</div>` : ''}
+                    ${remarks ? `<div style="font-size: 12px; color: #3f3f46; line-height: 1.5; margin-bottom: 8px; max-height: 120px; overflow-y: auto; padding-right: 4px; white-space: pre-line;">${remarks}</div>` : ''}
                     <div style="font-size: 11px; color: #71717a; border-top: 1px solid #e5e7eb; padding-top: 6px; margin-top: 6px;">
                       📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}
                     </div>

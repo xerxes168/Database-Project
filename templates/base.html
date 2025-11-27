@@ -277,13 +277,6 @@
             </button>
             {% endif %}
 
-            <!-- Amenities icon -->
-            <button class="w-10 h-10 rounded-full bg-white text-slate-500 hover:bg-slate-100 flex items-center justify-center shadow-sm transition" data-panel-target="amenities">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
-              </svg>
-            </button>
           </div>
         </div>
 
@@ -425,64 +418,6 @@
               </div>
             </section>
 
-            <!-- Amenities panel -->
-            <section id="panel-amenities" data-panel="amenities" class="space-y-4 hidden">
-              <div class="p-6 bg-white rounded-xl border border-zinc-200 card-hover">
-                <h2 class="text-lg font-semibold mb-4 text-slate-900">Amenity Viewer</h2>
-                
-                <div class="space-y-4">
-                  <div>
-                    <label class="block text-sm font-medium mb-2 text-zinc-700">Amenity Type</label>
-                    <select id="amenity-class" class="w-full bg-slate-100 border border-slate-300 text-slate-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
-                      <option value="">All amenities</option>
-                      <option value="CLINIC">Clinics</option>
-                      <option value="SUPERMARKET">Supermarkets</option>
-                      <option value="MRT_STATION">MRT stations</option>
-                      <option value="SCHOOL">Schools</option>
-                      <option value="PARK">Parks</option>
-                    </select>
-                    <button id="btn-amenity-stats" class="mt-3 w-full px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 font-medium transition-all text-white shadow-md">
-                      Load Amenities on Map
-                    </button>
-                  </div>
-
-                  <div id="amenity-loading" class="hidden text-sm text-zinc-600 flex items-center space-x-2 p-3 bg-slate-100 rounded-lg">
-                    <div class="spinner"></div>
-                    <span>Loading amenities...</span>
-                  </div>
-
-                  <div id="amenity-stats" class="grid grid-cols-1 gap-3">
-                    <!-- Stats will be populated here -->
-                  </div>
-
-                  <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div class="text-xs font-semibold text-blue-900 mb-2">Legend</div>
-                    <div class="space-y-1 text-xs text-blue-800">
-                      <div class="flex items-center gap-2">
-                        <span class="text-base">🚇</span>
-                        <span>MRT Stations (Red)</span>
-                      </div>
-                      <div class="flex items-center gap-2">
-                        <span class="text-base">🏫</span>
-                        <span>Schools (Blue)</span>
-                      </div>
-                      <div class="flex items-center gap-2">
-                        <span class="text-base">🏥</span>
-                        <span>Clinics (Green)</span>
-                      </div>
-                      <div class="flex items-center gap-2">
-                        <span class="text-base">🛒</span>
-                        <span>Supermarkets (Orange)</span>
-                      </div>
-                      <div class="flex items-center gap-2">
-                        <span class="text-base">🌳</span>
-                        <span>Parks (Green)</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </section>
 
             <!-- Data / meta panel -->
             <section id="panel-data" data-panel="data" class="space-y-4 hidden">
@@ -533,10 +468,6 @@
         affordability: {
           title: 'Affordability tools',
           subtitle: 'Estimate your budget and see what flats you can afford.'
-        },
-        amenities: {
-          title: 'Amenities & GeoJSON',
-          subtitle: 'View amenity locations with custom icons on the map.'
         },
         data: {
           title: 'Data & metadata',
