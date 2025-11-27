@@ -12,6 +12,7 @@ let compareTownMarkers = [];
 let townGeometries = {};
 let amenitiesData = null;
 let currentListingPopup = null;
+let lastAffordSignature = null;
 
 // Amenity icon configurations
 const AMENITY_ICONS = {
@@ -560,9 +561,11 @@ function highlightComparedTownsOnMap(comparison) {
 function showListingsOnMap(listings) {
   if (!hdbMap || !listings || listings.length === 0) return;
 
+  // Clear any existing markers and polygon highlights before drawing new listings
   clearListingMarkers();
   clearAmenityMarkers();
   clearTownPolygons();
+  clearCompareTownHighlights();
 
   const bounds = new mapboxgl.LngLatBounds();
 
@@ -1020,6 +1023,8 @@ async function setupAffordabilityPanel() {
       </div>
     `;
     
+    let hasChanged = false;
+    
     try {
       const payload = {
         income: parseFloat($("#af-income")?.value) || 0,
@@ -1028,6 +1033,17 @@ async function setupAffordabilityPanel() {
         tenure_years: parseInt($("#af-tenure")?.value) || 25,
         down_payment_pct: parseFloat($("#af-downpayment")?.value) || 20,
       };
+      
+      // Compute a simple signature of the current calculator state
+      const signature = JSON.stringify(payload);
+      hasChanged = signature !== lastAffordSignature;
+      
+      // Only clear markers (and later reload houses) if user actually changed inputs
+      if (hasChanged) {
+        clearListingMarkers();
+        clearAmenityMarkers();
+        lastAffordSignature = signature;
+      }
       
       const res = await postJSON("/api/affordability", payload);
       
@@ -1089,11 +1105,89 @@ async function setupAffordabilityPanel() {
           </div>
         </div>
       `;
+
+      // After showing the calculation result, also show affordable listings on the map
+      // Only reload map markers if inputs changed
+      if (hasChanged) {
+        try {
+          const maxValue = typeof res.max_property_value === "number"
+            ? res.max_property_value
+            : (res.max_property_value ? parseFloat(res.max_property_value) : NaN);
+
+          if (!Number.isNaN(maxValue) && maxValue > 0) {
+            await loadAffordableListingsOnMap(maxValue);
+          } else {
+            console.warn("Affordability result did not contain a usable max_property_value; skipping map update.");
+          }
+        } catch (mapErr) {
+          console.warn("Error while trying to show affordable listings on map:", mapErr);
+        }
+      }
     } catch (err) {
       showError(afResult, err.message);
       console.error("Affordability calculation error:", err);
     }
   });
+}
+
+// Helper: Show affordable listings on map, filtered by max property value and current search filters
+async function loadAffordableListingsOnMap(maxPropertyValue, options = {}) {
+  if (!hdbMap) {
+    console.warn("Map not initialized; cannot show affordable listings.");
+    return;
+  }
+
+  if (!maxPropertyValue || Number.isNaN(maxPropertyValue)) {
+    console.warn("Invalid maxPropertyValue passed to loadAffordableListingsOnMap:", maxPropertyValue);
+    return;
+  }
+
+  try {
+    // Optionally respect town/flat-type filters from the Search Listings panel if present
+    const townFilterEl = $("#listing-town-filter");
+    const flatTypeFilterEl = $("#listing-flat-type-filter");
+
+    const payload = {
+      query: "",
+      town: townFilterEl ? (townFilterEl.value || null) : (options.town || null),
+      flat_type: flatTypeFilterEl ? (flatTypeFilterEl.value || null) : (options.flat_type || options.flatType || null),
+      limit: options.limit || 200
+    };
+
+    const res = await postJSON("/api/listings/search", payload);
+
+    if (!res || !res.ok || !Array.isArray(res.results)) {
+      console.warn("Could not load listings for affordability map view:", res && res.error);
+      return;
+    }
+
+    const allListings = res.results;
+
+    const affordableListings = allListings.filter((listing) => {
+      const candidate =
+        listing.price ??
+        listing.resale_price ??
+        listing.estimated_price;
+
+      const price =
+        typeof candidate === "number"
+          ? candidate
+          : candidate
+          ? parseFloat(candidate)
+          : NaN;
+
+      return price && !Number.isNaN(price) && price <= maxPropertyValue;
+    });
+
+    if (!affordableListings.length) {
+      console.info("No listings found under the calculated affordability limit.");
+    }
+
+    // Reuse existing logic to clear markers and draw listings
+    showListingsOnMap(affordableListings);
+  } catch (err) {
+    console.error("Error in loadAffordableListingsOnMap:", err);
+  }
 }
 
 // ========== PANEL 4: TOWN COMPARISON ==========
