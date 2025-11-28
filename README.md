@@ -6,21 +6,29 @@ Full-Stack Housing Analytics Application using MySQL + MongoDB + Flask + HTML/CS
 📌 Overview
 
 HDB HomeFinder DB is a full-stack database application designed to help users and analysts explore Singapore’s HDB resale market.
+
 The project integrates:
-    - a relational MySQL database for structured resale information, household income, expenditure, mortgage rules, user accounts and logging,
-    - a MongoDB database for flexible and semi-structured datasets such as amenities (GeoJSON), listing remarks, and saved scenarios.
+
+- a relational MySQL database for structured resale information, household income, expenditure, mortgage rules, user accounts and loggings.
+- a MongoDB database for flexible and semi-structured datasets such as amenities (GeoJSON), listing remarks (text search), town metadata and saved scenarios.
 
 The application features:
 
 ✔ Authentication & user management
+
 ✔ Resale price trend analysis (SQL window functions)
+
 ✔ Affordability calculator using income, expenditure, mortgage rules
+
 ✔ Town comparison engine enriched with MongoDB metadata
+
 ✔ Amenity map (GeoJSON)
+
 ✔ Saved scenarios (MongoDB)
+
 ✔ Admin analytics dashboard using MySQL views & logs
 
-This README serves as the installation guide, user manual, technical explanation, and architecture documentation for submission.
+This README serves as the installation guide, project overview, and user manual.
 
 ## System Architecture
 
@@ -43,30 +51,31 @@ Frontend (HTML/CSS/JS) → Flask API → MySQL (Aiven) + MongoDB Atlas
     - REST endpoints returning JSON responses
 
 3. Databases
-🔵 MySQL (Relational Database)
 
-Stores highly structured data with constraints, foreign keys, and advanced SQL logic.
+    🔵 MySQL (Relational Database)
 
-Used for:
+    Stores highly structured data with constraints, foreign keys, and advanced SQL logic.
 
-Resale flat data
-Household income & expenditure
-Mortgage rules & interest rates
-Authentication
-Login logs & user activity
-User preferences
+    Used for:
 
-🟢 MongoDB (NoSQL Database)
+    - Resale flat data
+    - Household income & expenditure
+    - Mortgage rules & interest rates
+    - Authentication
+    - Login logs & user activity
+    - User preferences
 
-Stores semi-structured or flexible datasets:
+    🟢 MongoDB (NoSQL Database)
 
-Used for:
+    Stores semi-structured or flexible datasets:
 
-- Amenities (GeoJSON)
-- Listing remarks (text search)
-Town metadata
-Saved “What-If” scenarios
-User profiles (search history, favourites)
+    Used for:
+
+    - Amenities (GeoJSON)
+    - Listing remarks (text search)
+    - Town metadata
+    - Saved “What-If” scenarios
+    - User profiles (search history, favourites)
 
 ## 📂 Project Structure
 
@@ -84,7 +93,7 @@ User profiles (search history, favourites)
 ├── static/
 │   ├── css/styles.css
 │   └── js/app.js
-├── data/                      # CSV / JSON datasets (manual placement)
+├── data/                      # CSV / JSON datasets 
 ├── README.md                  # This file
 └── requirements.txt           # Python dependencies
 ```
@@ -140,7 +149,9 @@ python app.py
 
 Visit:
 
-<http://localhost:5000>
+```arduino
+http://localhost:5000
+```
 
 ## 👨‍💻 User Manual
 
@@ -156,15 +167,90 @@ Visit:
 3. Explore features
 
     - Once logged in:
-        - View price trends
-        - View resale transactions
-        - Compare towns
-        - Check affordability
-        - Save scenarios
+    - Resale price trends
+    - Resale transactions
+    - Town comparison
+    - Affordability calculator
+    - Saved scenarios
+    - Amenities map
 
 4. Admin Dashboard
 
     - Only available to users with is_admin = TRUE.
+
+## Features Summary
+
+🔐 Authentication
+
+- Secure login & registration
+- Hashed passwords
+- Account lockout + login logs
+- Role-based access
+
+📈 Resale Price Trends
+
+- SQL window functions
+- Month-wise median PSM
+- Multi-line charts
+
+🏘 Town Comparison
+
+- SQL + Mongo hybrid query
+- Median PSM, minimum, maximum, transaction volume
+- Region + maturity + metadata
+
+💰 Affordability Calculator
+
+- Uses household income/expenditure
+- Loan rules, interest rates
+- Max loan, monthly instalment, estimated property budget
+- Save scenarios (MongoDB)
+
+🗺 Amenities Map
+
+- MongoDB GeoJSON
+- Filter by town
+- Mapbox integration
+
+🧠 Listing Remarks Search
+
+- MongoDB full-text search
+
+📊 Admin Dashboard
+
+- View login logs, activity logs
+- Views (user_statistics, activity_summary)
+
+## Tech Stack
+
+Backend
+
+- Python 3
+- Flask
+- Flask-Login
+- Flask-Bcrypt
+- SQLAlchemy
+- PyMySQL
+- PyMongo
+
+Frontend
+
+- HTML5
+- CSS3
+- JavaScript (ES6)
+- Chart.js
+- Mapbox GL JS
+
+Databases
+
+- MySQL (Aiven)
+- MongoDB Atlas
+
+Infrastructure
+
+- Aiven (managed MySQL)
+- MongoDB Atlas cluster
+- Environment-configurable .env
 
 ## 👥 Team 42 Members
 
