@@ -1,8 +1,5 @@
-# db_mysql.py
-"""
-MySQL Database Operations for HDB HomeFinder DB
-Uses SQLAlchemy with PyMySQL driver for Aiven MySQL
-"""
+# MySQL Database Operations for HDB HomeFinder DB
+# Uses SQLAlchemy with PyMySQL driver for Aiven MySQL
 
 import os
 from sqlalchemy import create_engine, text
@@ -13,7 +10,7 @@ load_dotenv()
 
 # ========== DATABASE CONNECTION ==========
 def get_engine():
-    """Create SQLAlchemy engine with SSL for Aiven MySQL"""
+    # Create SQLAlchemy engine with SSL for Aiven MySQL
     url = URL.create(
         drivername="mysql+pymysql",
         username=os.getenv("MYSQL_USER"),
@@ -33,7 +30,7 @@ engine = get_engine()
 # ========== METADATA QUERIES ==========
 
 def get_towns():
-    """Get all unique towns from resale data"""
+    # Get all unique towns from resale data
     with engine.connect() as conn:
         result = conn.execute(text("""
             SELECT DISTINCT town 
@@ -44,7 +41,7 @@ def get_towns():
         return [row[0] for row in result]
 
 def get_flat_types():
-    """Get all flat types (prioritize from specifications table if available)"""
+    # Get all flat types (prioritize from specifications table if available)
     with engine.connect() as conn:
         # Try to get from flat_type_specifications first
         try:
@@ -79,7 +76,7 @@ def get_flat_types():
         return [row[0] for row in result]
 
 def get_months():
-    """Get available transaction months"""
+    # Get available transaction months
     with engine.connect() as conn:
         result = conn.execute(text("""
             SELECT DISTINCT month 
@@ -90,7 +87,7 @@ def get_months():
         return [row[0] for row in result]
 
 def get_total_transaction_count():
-    """Get total number of transactions in database"""
+    # Get total number of transactions in database
     with engine.connect() as conn:
         result = conn.execute(text("""
             SELECT COUNT(*) as total
@@ -102,7 +99,7 @@ def get_total_transaction_count():
 # ========== FLAT TYPE SPECIFICATIONS ==========
 
 def get_flat_type_specs(flat_type=None):
-    """Get flat type specifications"""
+    # Get flat type specifications
     with engine.connect() as conn:
         if flat_type:
             result = conn.execute(text("""
@@ -134,7 +131,7 @@ def get_flat_type_specs(flat_type=None):
 # ========== MORTGAGE & LOAN QUERIES ==========
 
 def get_current_mortgage_rate():
-    """Get the most recent mortgage rates"""
+    # Get the most recent mortgage rates
     with engine.connect() as conn:
         try:
             result = conn.execute(text("""
@@ -159,7 +156,7 @@ def get_current_mortgage_rate():
     return {"year": 2024, "quarter": 4, "hdb_rate": 2.6, "cpf_rate": 2.7, "bank_rate": 3.2}
 
 def get_current_loan_rules():
-    """Get the most current HDB loan eligibility rules"""
+    # Get the most current HDB loan eligibility rules
     with engine.connect() as conn:
         try:
             result = conn.execute(text("""
@@ -195,7 +192,7 @@ def get_current_loan_rules():
 # ========== INCOME & EXPENDITURE ==========
 
 def get_latest_household_income():
-    """Get the most recent household income data"""
+    # Get the most recent household income data
     with engine.connect() as conn:
         try:
             result = conn.execute(text("""
@@ -219,7 +216,7 @@ def get_latest_household_income():
     return None
 
 def get_household_expenditure_latest():
-    """Get the most recent household expenditure breakdown"""
+    #Get the most recent household expenditure breakdown
     with engine.connect() as conn:
         try:
             result = conn.execute(text("""
@@ -242,10 +239,9 @@ def get_household_expenditure_latest():
 # ========== ADVANCED RESALE QUERIES ==========
 
 def query_trends(town, flat_type, start_month, end_month):
-    """
-    Advanced SQL query with window functions and aggregates
-    Returns: median, avg, percentiles, counts by month
-    """
+    # Advanced SQL query with window functions and aggregates
+    # Returns median, avg, percentiles and counts by month
+
     with engine.connect() as conn:
         result = conn.execute(text("""
             WITH price_data AS (
@@ -307,9 +303,7 @@ def query_trends(town, flat_type, start_month, end_month):
         return [dict(row._mapping) for row in result]
 
 def query_transactions(town, flat_type, limit=20):
-    """
-    Get recent transactions with enhanced property information
-    """
+    # Get recent transactions with enhanced property information
     with engine.connect() as conn:
         result = conn.execute(text("""
             SELECT 
@@ -342,9 +336,7 @@ def query_transactions(town, flat_type, limit=20):
         return [dict(row._mapping) for row in result]
 
 def query_town_comparison(towns, flat_type):
-    """
-    Compare multiple towns across various metrics
-    """
+    # Compare multiple towns across various metrics
     if not towns:
         return []
     
@@ -393,9 +385,7 @@ def query_town_comparison(towns, flat_type):
 # ========== AFFORDABILITY CALCULATION ==========
 
 def calculate_affordability_enhanced(income, expenses, loan_type="hdb", use_current_rates=True):
-    """
-    Enhanced affordability calculation using actual database data
-    """
+    #Enhanced affordability calculation using actual database data
     # Get current loan rules
     rules = get_current_loan_rules()
     
@@ -465,7 +455,7 @@ def calculate_affordability_enhanced(income, expenses, loan_type="hdb", use_curr
 # ========== MARKET STATISTICS ==========
 
 def get_market_statistics():
-    """Get overall market statistics"""
+    # Get overall market statistics
     with engine.connect() as conn:
         try:
             result = conn.execute(text("""
@@ -494,7 +484,7 @@ def get_market_statistics():
 # ========== USER MANAGEMENT FUNCTIONS ==========
 
 def get_user_by_email(email):
-    """Get user by email"""
+    # Get user by email
     with engine.connect() as conn:
         result = conn.execute(text("""
             SELECT user_id, email, full_name, is_admin, is_active, created_at, last_login
@@ -508,7 +498,7 @@ def get_user_by_email(email):
         return None
 
 def get_user_by_id(user_id):
-    """Get user by ID"""
+    # Get user by ID
     with engine.connect() as conn:
         result = conn.execute(text("""
             SELECT user_id, email, full_name, is_admin, is_active, created_at, last_login
@@ -522,7 +512,7 @@ def get_user_by_id(user_id):
         return None
 
 def get_user_preferences(user_id):
-    """Get user preferences from MySQL"""
+    # Get user preferences from MySQL
     with engine.connect() as conn:
         result = conn.execute(text("""
             SELECT *
@@ -536,7 +526,7 @@ def get_user_preferences(user_id):
         return None
 
 def save_user_preferences(user_id, preferences):
-    """Save user preferences to MySQL"""
+    # Save user preferences to MySQL
     import json
     
     with engine.connect() as conn:
@@ -580,7 +570,7 @@ def save_user_preferences(user_id, preferences):
         return True
 
 def get_user_login_history(user_id, limit=10):
-    """Get user's login history"""
+    # Get user's login history
     with engine.connect() as conn:
         result = conn.execute(text("""
             SELECT log_id, login_timestamp, ip_address, login_successful, failure_reason
@@ -593,7 +583,7 @@ def get_user_login_history(user_id, limit=10):
         return [dict(row._mapping) for row in result]
 
 def get_user_activity_stats(user_id, days=30):
-    """Get user's activity statistics"""
+    # Get user's activity statistics
     with engine.connect() as conn:
         result = conn.execute(text("""
             CALL sp_get_user_activity_summary(:user_id, :days)
@@ -604,7 +594,7 @@ def get_user_activity_stats(user_id, days=30):
 # ========== ADMIN ANALYTICS FUNCTIONS ==========
 
 def get_system_statistics():
-    """Get overall system statistics (admin only)"""
+    # Get overall system statistics (admin only)
     with engine.connect() as conn:
         result = conn.execute(text("""
             SELECT 
@@ -625,7 +615,7 @@ def get_system_statistics():
         return {}
 
 def get_popular_towns(limit=10):
-    """Get most popular towns based on user searches"""
+    # Get most popular towns based on user searches
     with engine.connect() as conn:
         result = conn.execute(text("""
             SELECT 
@@ -643,7 +633,7 @@ def get_popular_towns(limit=10):
         return [dict(row._mapping) for row in result]
 
 def get_popular_flat_types(limit=10):
-    """Get most popular flat types based on user searches"""
+    # Get most popular flat types based on user searches
     with engine.connect() as conn:
         result = conn.execute(text("""
             SELECT 
@@ -661,7 +651,7 @@ def get_popular_flat_types(limit=10):
         return [dict(row._mapping) for row in result]
 
 def get_recent_user_registrations(days=7):
-    """Get recent user registrations"""
+    # Get recent user registrations
     with engine.connect() as conn:
         result = conn.execute(text("""
             SELECT 

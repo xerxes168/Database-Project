@@ -1643,7 +1643,7 @@ async function bootstrap() {
       }
     });
     
-    // Populate month selects (reversed for chronological order - earliest first)
+    // Populate month selects (reversed for chronological order with earliest first)
     const startSel = $("#sel-start");
     const endSel = $("#sel-end");
     if (startSel && endSel && meta.months) {
@@ -1665,9 +1665,9 @@ async function bootstrap() {
     await setupListingsPanel();
     await setupAmenitiesPanel();
     
-    console.log("✅ Application ready!");
+    console.log("Application ready!");
   } catch (err) {
-    console.error("❌ Bootstrap error:", err);
+    console.error("Bootstrap error:", err);
     alert("Failed to initialize application: " + err.message);
   }
 }

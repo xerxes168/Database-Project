@@ -1,8 +1,5 @@
-# db_mongo.py
-"""
-MongoDB utilities for HDB HomeFinder DB.
-Handles: amenities, scenarios, listing_remarks, user_profiles, town_metadata
-"""
+# MongoDB utilities for HDB HomeFinder DB.
+# Handles amenities, scenarios, listing_remarks, user_profiles and town_metadata
 
 import os
 import hashlib
@@ -22,9 +19,9 @@ MONGO_DB = os.getenv("MONGO_DB", "homefinder")
 _client: Optional[MongoClient] = None
 
 
-# ---------- connection ----------
+# ========== CONNECTION ==========
 def get_db():
-    """Return a connected DB handle (reused client)."""
+    # Return a connected DB handle (reused client)
     global _client
     if _client is None:
         _client = MongoClient(
@@ -36,11 +33,9 @@ def get_db():
     return _client[MONGO_DB]
 
 
-# ---------- initialization ----------
+# ========== INTIALIZATION ==========
 def initialize_mongodb() -> bool:
-    """
-    Create collections + indexes if absent. Safe to call multiple times.
-    """
+    # Create collections + indexes if absent
     try:
         db = get_db()
 
@@ -104,7 +99,7 @@ def initialize_mongodb() -> bool:
         return False
 
 
-# ---------- helpers ----------
+# ========== HELPERS ==========
 def _norm_name(x: str) -> str:
     return " ".join(str(x or "").split()).upper()
 
@@ -114,9 +109,9 @@ def _amenity_key(amenity_type: str, name: str, lon: float, lat: float) -> str:
     return hashlib.md5(s.encode()).hexdigest()
 
 
-# ---------- AMENITIES API ----------
+# ========== AMENITIES API ==========
 def save_geojson_amenities(features: Iterable[Dict[str, Any]]) -> Dict[str, int]:
-    """Upsert a batch of GeoJSON features into 'amenities'."""
+    # Upsert a batch of GeoJSON features into 'amenities'
     db = get_db()
     ops: List[UpdateOne] = []
     now = datetime.utcnow()
@@ -176,7 +171,7 @@ def get_amenities_near_location(longitude: float, latitude: float,
                                 max_distance_meters: int = 1000,
                                 amenity_type: Optional[str] = None, 
                                 limit: int = 50) -> List[Dict[str, Any]]:
-    """Find amenities near (lon, lat). Uses 2dsphere index."""
+    # Find amenities near (lon, lat). Uses 2dsphere index
     db = get_db()
     query: Dict[str, Any] = {
         "geometry": {
@@ -194,7 +189,7 @@ def get_amenities_near_location(longitude: float, latitude: float,
 
 
 def get_amenity_stats_global() -> List[Dict[str, Any]]:
-    """Global counts by amenity_type."""
+    # Global counts by amenity_type
     db = get_db()
     pipeline = [
         {"$group": {"_id": "$properties.amenity_type", "count": {"$sum": 1}}},
@@ -205,7 +200,7 @@ def get_amenity_stats_global() -> List[Dict[str, Any]]:
 
 
 def get_amenity_stats_by_town(town: str) -> Dict[str, Any]:
-    """Get amenity counts (simplified version)."""
+    # Get amenity counts (simplified version)
     db = get_db()
     
     pipeline = [
@@ -226,9 +221,9 @@ def get_amenity_stats_by_town(town: str) -> Dict[str, Any]:
     return stats
 
 
-# ---------- LISTING REMARKS API (TEXT SEARCH) ----------
+# ========== LISTING REMARKS API (TEXT SEARCH) ==========
 def save_listing_remark(remark_data: Dict[str, Any]) -> str:
-    """Save a listing remark/description."""
+    # Save a listing remark/description
     db = get_db()
     remark_data = dict(remark_data)
     remark_data.setdefault("created_date", datetime.utcnow())
@@ -239,10 +234,6 @@ def save_listing_remark(remark_data: Dict[str, Any]) -> str:
 def search_listing_remarks(query: str, town: Optional[str] = None, 
                           flat_type: Optional[str] = None, 
                           limit: int = 20) -> List[Dict[str, Any]]:
-    """
-    Full-text search on listing remarks.
-    This demonstrates MongoDB text indexing capabilities.
-    """
     db = get_db()
     
     search_filter: Dict[str, Any] = {"$text": {"$search": query}}
@@ -270,7 +261,7 @@ def search_listing_remarks(query: str, town: Optional[str] = None,
 
 
 def get_recent_listings(town: Optional[str] = None, limit: int = 10) -> List[Dict[str, Any]]:
-    """Get recent listing remarks."""
+    # Get recent listing remarks
     db = get_db()
     query = {"town": town} if town else {}
     
@@ -284,9 +275,9 @@ def get_recent_listings(town: Optional[str] = None, limit: int = 10) -> List[Dic
     return results
 
 
-# ---------- USER PROFILES API ----------
+# ========== USER PROFILES API ==========
 def save_user_profile(profile_data: Dict[str, Any]) -> str:
-    """Save a user profile."""
+    # Save a user profile
     db = get_db()
     profile_data = dict(profile_data)
     profile_data.setdefault("registration_date", datetime.utcnow())
@@ -304,7 +295,7 @@ def save_user_profile(profile_data: Dict[str, Any]) -> str:
 
 
 def get_user_profile(user_id: str) -> Optional[Dict[str, Any]]:
-    """Get user profile by ID or email."""
+    # Get user profile by ID or email
     db = get_db()
     
     try:
@@ -318,7 +309,7 @@ def get_user_profile(user_id: str) -> Optional[Dict[str, Any]]:
 
 
 def add_search_to_history(user_id: str, search_query: Dict[str, Any], results_count: int):
-    """Add a search to user's search history."""
+    # Add a search to user's search history
     db = get_db()
     
     search_entry = {
@@ -341,7 +332,7 @@ def add_search_to_history(user_id: str, search_query: Dict[str, Any], results_co
 
 
 def save_listing_to_favorites(user_id: str, block: str, street: str, town: str):
-    """Save a listing to user's favorites."""
+    # Save a listing to user's favorites
     db = get_db()
     
     favorite = {
@@ -358,7 +349,7 @@ def save_listing_to_favorites(user_id: str, block: str, street: str, town: str):
 
 
 def get_user_recommendations(user_id: str) -> List[str]:
-    """Get town recommendations based on user preferences and search history."""
+    #Get town recommendations based on user preferences and search history
     db = get_db()
     
     user = db.user_profiles.find_one({"email": user_id})
@@ -378,9 +369,9 @@ def get_user_recommendations(user_id: str) -> List[str]:
     return all_towns[:5]  # Return top 5
 
 
-# ---------- TOWN METADATA API ----------
+# ========== TOWN METADATA API ==========
 def get_town_metadata(town_name: str) -> Optional[Dict[str, Any]]:
-    """Get metadata for a specific town."""
+    # Get metadata for a specific town
     db = get_db()
     doc = db.town_metadata.find_one({"town_name": town_name})
     if doc:
@@ -390,7 +381,7 @@ def get_town_metadata(town_name: str) -> Optional[Dict[str, Any]]:
 
 def get_all_town_metadata(region: Optional[str] = None, 
                           maturity: Optional[str] = None) -> List[Dict[str, Any]]:
-    """Get all town metadata with optional filtering."""
+    # Get all town metadata with optional filtering
     db = get_db()
     
     query = {}
@@ -410,7 +401,7 @@ def get_all_town_metadata(region: Optional[str] = None,
 
 
 def search_towns_by_characteristics(characteristics: List[str]) -> List[Dict[str, Any]]:
-    """Find towns with specific characteristics (tags)."""
+    # Find towns with specific characteristics (tags)
     db = get_db()
     
     cursor = db.town_metadata.find({
@@ -425,9 +416,9 @@ def search_towns_by_characteristics(characteristics: List[str]) -> List[Dict[str
     return results
 
 
-# ---------- SCENARIO MANAGEMENT ----------
+# ========== SCENARIO MANAGEMENT ==========
 def save_scenario(doc: Dict[str, Any]) -> str:
-    """Save an affordability scenario."""
+    # Save an affordability scenario
     db = get_db()
     doc = dict(doc)
     doc.setdefault("created_at", datetime.utcnow())
@@ -436,7 +427,7 @@ def save_scenario(doc: Dict[str, Any]) -> str:
 
 
 def list_scenarios(user_id: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
-    """List all saved scenarios, optionally filtered by user."""
+    # List all saved scenarios, optionally filtered by user
     db = get_db()
     
     query = {"user_id": user_id} if user_id else {}
@@ -451,7 +442,7 @@ def list_scenarios(user_id: Optional[str] = None, limit: int = 50) -> List[Dict[
 
 
 def get_scenario(scenario_id: str) -> Optional[Dict[str, Any]]:
-    """Get a single scenario by ID."""
+    # Get a single scenario by ID
     db = get_db()
     try:
         doc = db.scenarios.find_one({"_id": ObjectId(scenario_id)})
@@ -463,7 +454,7 @@ def get_scenario(scenario_id: str) -> Optional[Dict[str, Any]]:
 
 
 def delete_scenario(scenario_id: str) -> bool:
-    """Delete a scenario by ID."""
+    # Delete a scenario by ID
     db = get_db()
     try:
         result = db.scenarios.delete_one({"_id": ObjectId(scenario_id)})
@@ -472,9 +463,9 @@ def delete_scenario(scenario_id: str) -> bool:
         return False
 
 
-# ---------- ANALYTICS ----------
+# ========== ANALYTICS ==========
 def get_popular_search_terms(limit: int = 10) -> List[Dict[str, Any]]:
-    """Get most popular search terms from user search history."""
+    # Get most popular search terms from user search history
     db = get_db()
     
     pipeline = [
@@ -494,7 +485,7 @@ def get_popular_search_terms(limit: int = 10) -> List[Dict[str, Any]]:
 
 
 def get_listing_statistics() -> Dict[str, Any]:
-    """Get statistics about listing remarks."""
+    # Get statistics about listing remarks
     db = get_db()
     
     total = db.listing_remarks.count_documents({})
@@ -518,7 +509,7 @@ def get_listing_statistics() -> Dict[str, Any]:
 
 
 def check_database_health() -> bool:
-    """Check if MongoDB is accessible."""
+    # Check if MongoDB database is accessible
     try:
         db = get_db()
         db.command("ping")

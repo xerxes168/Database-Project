@@ -1,13 +1,9 @@
-# auth.py
-"""
-Authentication and Authorization Module for HDB HomeFinder DB
-Handles user registration, login, password hashing, and session management
-"""
+# Authentication and Authorization Module for HDB HomeFinder DB
+# Handles user registration, login, password hashing, and session management
 
-import os
 from datetime import datetime
 from functools import wraps
-from flask import session, redirect, url_for, request, jsonify
+from flask import jsonify
 from flask_login import LoginManager, UserMixin, current_user
 from flask_bcrypt import Bcrypt
 from sqlalchemy import text
@@ -45,7 +41,7 @@ class User(UserMixin):
     def is_active(self, value):
         self._is_active = value
 
-# ========== FLASK-LOGIN CONFIGURATION ==========
+# ========== FLASK LOGIN CONFIGURATION ==========
 @login_manager.user_loader
 def load_user(user_id):
     """Load user by ID for Flask-Login"""
@@ -161,7 +157,7 @@ def authenticate_user(email, password, ip_address=None, user_agent=None):
             row = result.fetchone()
             
             if not row:
-                # User not found - log failed attempt with NULL user_id
+                # User not found, log failed attempt with NULL user_id
                 log_login_attempt(None, False, "User not found", ip_address, user_agent)
                 return False, "Invalid email or password"
             
@@ -198,7 +194,7 @@ def authenticate_user(email, password, ip_address=None, user_agent=None):
                 log_login_attempt(user_id, False, "Invalid password", ip_address, user_agent)
                 return False, "Invalid email or password"
             
-            # Successful login - reset failed attempts and update last login
+            # Successful login, reset failed attempts and update last login
             conn.execute(text("""
                 UPDATE users 
                 SET failed_login_attempts = 0,

@@ -1,8 +1,7 @@
-# app.py
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for
+from flask import Flask, render_template, request, jsonify, redirect, url_for
 from flask_login import login_user, logout_user, login_required, current_user
-from werkzeug.utils import secure_filename
-import os, json
+# from werkzeug.utils import secure_filename
+import os
 from datetime import datetime
 from pymongo import MongoClient
 from functools import wraps
@@ -11,11 +10,11 @@ from functools import wraps
 from db_mysql import (
     get_towns, get_flat_types, get_months,
     query_trends, query_transactions, query_town_comparison,
-    get_total_transaction_count, get_flat_type_specs,
+    get_total_transaction_count,
     get_current_mortgage_rate, get_current_loan_rules,
     get_latest_household_income, get_household_expenditure_latest,
     calculate_affordability_enhanced, get_market_statistics,
-    # NEW: Auth-related imports
+    # Auth related imports
     get_user_by_id, get_user_preferences, save_user_preferences,
     get_user_login_history, get_user_activity_stats,
     get_system_statistics, get_popular_towns, get_popular_flat_types,
@@ -23,19 +22,15 @@ from db_mysql import (
 )
 
 from db_mongo import (
-    # Amenities
-    save_geojson_amenities, get_amenity_stats_global, get_amenity_stats_by_town,
     # Listing Remarks
-    save_listing_remark, search_listing_remarks, get_recent_listings,
+    search_listing_remarks, get_recent_listings,
     # User Profiles
     save_user_profile, get_user_profile, add_search_to_history, 
-    save_listing_to_favorites, get_user_recommendations,
+    save_listing_to_favorites,
     # Town Metadata
-    get_town_metadata, get_all_town_metadata, search_towns_by_characteristics,
+    get_town_metadata,
     # Scenarios
     save_scenario, list_scenarios, get_scenario, delete_scenario,
-    # Analytics
-    get_popular_search_terms, get_listing_statistics,
     # Init
     initialize_mongodb
 )
@@ -48,7 +43,7 @@ from auth import (
     get_all_users, get_activity_summary, toggle_user_active_status
 )
 
-from bson import ObjectId
+# from bson import ObjectId
 
 # ========== FLASK APP INITIALIZATION ==========
 app = Flask(__name__)
@@ -852,6 +847,6 @@ def server_error(e):
 # ==================== STARTUP ====================
 
 if __name__ == "__main__":
-    print("🚀 Starting HDB HomeFinder DB with Authentication...")
-    print(f"📍 Server running on http://0.0.0.0:5000")
+    print("Starting HDB HomeFinder DB with Authentication...")
+    print(f"Server running on http://0.0.0.0:5000")
     app.run(debug=True, host="0.0.0.0", port=5000)
