@@ -1,318 +1,176 @@
-# HDB HomeFinder DB
+# 🏠 HDB HomeFinder DB
 
-A comprehensive database application for exploring Singapore's HDB resale market with integrated MySQL and MongoDB databases.
+INF2003 Database Systems — Group 42
+Full-Stack Housing Analytics Application using MySQL + MongoDB + Flask + HTML/CSS/JS
 
-## 🏗️ Architecture
+📌 Overview
 
-- **Backend**: Flask REST API
-- **Frontend**: Vanilla JavaScript with Tailwind CSS
-- **Databases**: 
-  - MySQL (via Aiven) - Structured resale transaction data
-  - MongoDB (Atlas) - Flexible GeoJSON amenity data & scenarios
-- **Features**:
-  - Advanced SQL queries with window functions
-  - NoSQL GeoJSON storage with geospatial indexing
-  - Real-time affordability calculator
-  - Town comparison analytics
-  - Interactive data visualizations
+HDB HomeFinder DB is a full-stack database application designed to help users and analysts explore Singapore’s HDB resale market.
+The project integrates:
+    - a relational MySQL database for structured resale information, household income, expenditure, mortgage rules, user accounts and logging,
+    - a MongoDB database for flexible and semi-structured datasets such as amenities (GeoJSON), listing remarks, and saved scenarios.
 
-## 📋 Prerequisites
+The application features:
 
-- Python 3.8+
-- MySQL database (Aiven or local)
-- MongoDB database (Atlas or local)
-- CSV data files for resale prices
+✔ Authentication & user management
+✔ Resale price trend analysis (SQL window functions)
+✔ Affordability calculator using income, expenditure, mortgage rules
+✔ Town comparison engine enriched with MongoDB metadata
+✔ Amenity map (GeoJSON)
+✔ Saved scenarios (MongoDB)
+✔ Admin analytics dashboard using MySQL views & logs
 
-## 🚀 Setup Instructions
+This README serves as the installation guide, user manual, technical explanation, and architecture documentation for submission.
 
-### 1. Clone and Install Dependencies
+## System Architecture
+
+Frontend (HTML/CSS/JS) → Flask API → MySQL (Aiven) + MongoDB Atlas
+
+1. Frontend
+
+    - HTML templates (index.html, login.html, register.html, admin.html)
+    - Custom CSS (styles.css)
+    - JavaScript logic (app.js)
+    - Chart.js for charts
+    - Mapbox GL JS for amenities map
+
+2. Backend (Flask)
+
+    - Session management via Flask-Login
+    - Password encryption with Flask-Bcrypt
+    - MySQL queries via SQLAlchemy + PyMySQL
+    - MongoDB interactions via PyMongo
+    - REST endpoints returning JSON responses
+
+3. Databases
+🔵 MySQL (Relational Database)
+
+Stores highly structured data with constraints, foreign keys, and advanced SQL logic.
+
+Used for:
+
+Resale flat data
+Household income & expenditure
+Mortgage rules & interest rates
+Authentication
+Login logs & user activity
+User preferences
+
+🟢 MongoDB (NoSQL Database)
+
+Stores semi-structured or flexible datasets:
+
+Used for:
+
+- Amenities (GeoJSON)
+- Listing remarks (text search)
+Town metadata
+Saved “What-If” scenarios
+User profiles (search history, favourites)
+
+## 📂 Project Structure
+
+```text
+├── app.py                     # Main Flask application
+├── auth.py                    # Authentication routes
+├── db_mysql.py                # MySQL connection + SQL queries
+├── db_mongo.py                # MongoDB helpers + NoSQL queries
+├── templates/                 # Frontend HTML pages
+│   ├── base.html
+│   ├── index.html
+│   ├── login.html
+│   ├── register.html
+│   ├── admin.html
+├── static/
+│   ├── css/styles.css
+│   └── js/app.js
+├── data/                      # CSV / JSON datasets (manual placement)
+├── README.md                  # This file
+└── requirements.txt           # Python dependencies
+```
+
+## 🛠️ Installation & Setup
+
+1️⃣ Clone and install Python dependencies
 
 ```bash
 # Install Python dependencies
 pip install -r requirements.txt
 ```
 
-### 2. Configure Environment Variables
+2️⃣ Configure environment variables
 
-Create a `.env` file in the project root:
+Create a .env file:
 
 ```env
-# MySQL Configuration (Aiven)
-MYSQL_HOST=your-mysql-host.aivencloud.com
-MYSQL_PORT=12345
+# Aiven → Service Overview → Connection info
+MYSQL_HOST=mysql-310ddec4-greggyyy.k.aivencloud.com
+MYSQL_PORT=27950
 MYSQL_USER=avnadmin
-MYSQL_PASSWORD=your-password
-MYSQL_DB=homefinder
-MYSQL_SSL_CA=/path/to/ca.pem
+MYSQL_PASSWORD=AVNS_mQhInc77FoEHAtcpQ1o
+MYSQL_DB=defaultdb
 
-# MongoDB Configuration (Atlas)
-MONGO_URL=mongodb+srv://username:password@cluster.mongodb.net/
+# Path to the CA cert from Aiven
+MYSQL_SSL_CA=./ca.pem
+
+# Atlas MongoDB > MongoDB
+MONGO_URL=mongodb+srv://greggy_dbuser:JesusKing@homefinder-mongo.7d67tvq.mongodb.net/
 MONGO_DB=homefinder
+
+# Flask Configuration
+SECRET_KEY=92af2f20f6801794462986fa35bc90e7cdd35ff4a682bd632132f24783cb8c6f
+
+# Session Configuration
+SESSION_TYPE=filesystem
+PERMANENT_SESSION_LIFETIME=3600
+
+# Security Settings
+BCRYPT_LOG_ROUNDS=12
+
+# Application Settings
+FLASK_ENV=production
+FLASK_DEBUG=False
 ```
 
-### 3. Prepare Data Files
-
-Place your CSV files in the `data/` directory:
-
-```
-data/
-├── resale_flat_prices.csv          (Required)
-├── hdb_property_info.csv           (Optional)
-├── household_income.csv            (Optional)
-├── household_expenditure.csv       (Optional)
-└── geojson/                        (Optional - for amenities)
-    ├── MRTStations.geojson
-    ├── Schools.geojson
-    └── CHASClinics.geojson
-```
-
-### 4. Import Data
-
-#### Import MySQL Data (Resale Prices)
-
-```bash
-# Analyze CSV structure first (optional)
-python import_data.py --analyze
-
-# Import all data
-python import_data.py
-```
-
-This will:
-- Create MySQL tables
-- Import resale flat prices (217,253 records)
-- Import property information (optional)
-- Import income/expenditure data (optional)
-
-#### Import MongoDB Data (Amenities)
-
-```bash
-# Import all GeoJSON files from a directory
-python import_geojson_data.py --dir ./data/geojson
-
-# Or import a single file
-python import_geojson_data.py --file ./data/geojson/MRTStations.geojson
-
-# Verify imports
-python import_geojson_data.py --verify
-```
-
-### 5. Run the Application
+3️⃣ Launch the application
 
 ```bash
 python app.py
 ```
 
-The application will be available at `http://localhost:5000`
+Visit:
 
-## 📊 Database Schema
+<http://localhost:5000>
 
-### MySQL Tables
+## 👨‍💻 User Manual
 
-#### `resale_flat_prices`
-Primary table containing all HDB resale transactions:
-- `id` (INT, PRIMARY KEY)
-- `month` (VARCHAR) - Transaction month (YYYY-MM)
-- `town` (VARCHAR) - HDB town name
-- `flat_type` (VARCHAR) - e.g., "4 ROOM", "5 ROOM"
-- `block` (VARCHAR) - Block number
-- `street_name` (VARCHAR)
-- `storey_range` (VARCHAR) - e.g., "10 TO 12"
-- `floor_area_sqm` (INT)
-- `flat_model` (VARCHAR)
-- `lease_commence_date` (INT)
-- `remaining_lease` (VARCHAR)
-- `resale_price` (INT)
+1. Register a new account
 
-Indexes on: `month`, `town`, `flat_type`, `resale_price`
+    - Visit /register.
+    - Enter your email, name and password.
 
-#### `hdb_property_information` (Optional)
-Building-level information with room mix and facilities
+2. Log in
 
-#### `household_income` (Optional)
-Historical median household income by year
+    - Visit /login.
 
-#### `household_expenditure` (Optional)
-Household expenditure patterns by category
+3. Explore features
 
-### MongoDB Collections
+    - Once logged in:
+        - View price trends
+        - View resale transactions
+        - Compare towns
+        - Check affordability
+        - Save scenarios
 
-#### `amenities`
-GeoJSON Point features for amenities:
-```json
-{
-  "type": "Feature",
-  "geometry": {
-    "type": "Point",
-    "coordinates": [103.8198, 1.3521]
-  },
-  "properties": {
-    "amenity_type": "MRT",
-    "name": "ANG MO KIO",
-    "loaded_at": "2025-01-15T10:30:00Z"
-  },
-  "amenity_key": "unique_hash"
-}
-```
+4. Admin Dashboard
 
-Indexes: 2dsphere on `geometry`, unique on `amenity_key`
+    - Only available to users with is_admin = TRUE.
 
-#### `scenarios`
-Saved affordability calculations:
-```json
-{
-  "_id": ObjectId("..."),
-  "name": "Young Couple Budget",
-  "income": 7500,
-  "expenses": 2000,
-  "interest": 2.6,
-  "tenure_years": 25,
-  "created_at": "2025-01-15T10:30:00Z"
-}
-```
+## 👥 Team 42 Members
 
-## 🔍 Key Features
-
-### 1. Advanced SQL Queries
-- **Window Functions**: Median price calculation using `ROW_NUMBER()` and `PARTITION BY`
-- **Aggregates**: Monthly statistics with `AVG()`, `MIN()`, `MAX()`, `COUNT()`
-- **Trend Analysis**: Price per sqm trends over time
-
-### 2. NoSQL Geospatial Queries
-- **2dsphere Index**: Fast proximity searches for amenities
-- **Flexible Schema**: Store varying GeoJSON properties
-- **Upsert Operations**: Idempotent data imports
-
-### 3. Affordability Calculator
-- 30% income threshold rule
-- Mortgage payment calculations
-- Down payment considerations
-- Save scenarios to MongoDB
-
-### 4. Town Comparison
-- Multi-town analysis
-- Median vs average pricing
-- Transaction volume comparison
-- Amenity proximity scores
-
-## 🎨 UI Features
-
-- **Dark Theme**: Modern zinc color palette
-- **Responsive Design**: Mobile-friendly layout
-- **Interactive Charts**: Chart.js visualizations
-- **Tab Navigation**: Multiple feature panels
-- **Real-time Updates**: Dynamic data loading
-
-## 🐛 Troubleshooting
-
-### MySQL Connection Issues
-
-1. Check SSL certificate path in `.env`
-2. Verify firewall allows connection to Aiven
-3. Test connection:
-```python
-from db_mysql import get_engine
-engine = get_engine()
-with engine.connect() as conn:
-    result = conn.execute(text("SELECT 1"))
-    print("Connected!")
-```
-
-### MongoDB Connection Issues
-
-1. Whitelist your IP in MongoDB Atlas
-2. Verify connection string format
-3. Test connection:
-```python
-from db_mongo import get_db
-db = get_db()
-print(db.list_collection_names())
-```
-
-### Data Import Errors
-
-1. **Block number errors**: Ensure `block` column is VARCHAR (some blocks have letters like "406A")
-2. **Missing columns**: Check CSV column names match exactly
-3. **Memory issues**: Import in batches if dataset is large
-
-### Frontend Issues
-
-1. **Charts not rendering**: Check Chart.js CDN is loaded
-2. **No data in dropdowns**: Check `/api/meta` endpoint returns data
-3. **CORS errors**: Add `flask-cors` if accessing from different domain
-
-## 📝 API Endpoints
-
-### Metadata
-- `GET /api/meta` - Get towns, flat types, months
-
-### Search & Analysis
-- `POST /api/search/trends` - Get price trends with SQL window functions
-- `POST /api/search/transactions` - Get recent transactions
-- `POST /api/compare/towns` - Compare multiple towns
-
-### Affordability
-- `POST /api/affordability` - Calculate affordability
-- `GET /api/scenarios` - List saved scenarios
-- `POST /api/scenarios` - Save new scenario
-- `DELETE /api/scenarios?id=...` - Delete scenario
-
-### Amenities
-- `POST /api/amenities/upload` - Upload GeoJSON file
-- `GET /api/amenities/stats?town=...` - Get amenity statistics
-
-### Health
-- `GET /api/health` - System health check
-
-## 🔐 Security Notes
-
-- Never commit `.env` file
-- Use environment variables for all credentials
-- SSL required for production MySQL connections
-- Validate all user inputs on server side
-
-## 📦 Project Structure
-
-```
-hdb-homefinder-db/
-├── app.py                      # Flask application
-├── db_mysql.py                 # MySQL operations
-├── db_mongo.py                 # MongoDB operations
-├── import_data.py              # MySQL data import script
-├── import_geojson_data.py      # MongoDB GeoJSON import script
-├── requirements.txt            # Python dependencies
-├── .env                        # Environment variables (not in git)
-├── data/                       # CSV and GeoJSON files
-├── static/
-│   ├── css/
-│   │   └── styles.css
-│   └── js/
-│       └── app.js              # Frontend JavaScript
-└── templates/
-    ├── base.html               # Base template
-    └── index.html              # Main page
-```
-
-## 👥 Team
-
-INF2003 Database Systems Project - Team 42
-
-## 📄 License
-
-Educational project for SIT INF2003
-
-# INF2003 Database Systems Project Team Number 42
-
-Group members: Gregory Tan, Lucas Ng Hong Wei, Tan Zheng Liang, Neo Chuan Zong, Cheok Zi Hin, Dion Ko
-
-## Installing Requirements
-
-To install the required Python packages, run:
-
-```bash
-pip install -r requirements.txt
-```
-
-### **Running the web application**
-
-```python app.py```
+- Gregory Tan
+- Lucas Ng Hong Wei
+- Tan Zheng Liang
+- Neo Chuan Zong
+- Cheok Zi Hin
+- Dion Ko
