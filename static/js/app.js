@@ -9,7 +9,6 @@ let amenityMarkers = [];
 let townPolygons = [];
 let listingMarkers = [];
 let compareTownMarkers = [];
-let townGeometries = {};
 let amenitiesData = null;
 let currentListingPopup = null;
 let lastAffordSignature = null;
@@ -408,9 +407,14 @@ function highlightComparedTownsOnMap(comparison) {
 
     const extendCoord = (coord) => {
       if (!coord || coord.length < 2) return;
-      const lng = coord[0];
-      const lat = coord[1];
-      if (typeof lng !== "number" || typeof lat !== "number") return;
+      const rawLng = coord[0];
+      const rawLat = coord[1];
+
+      const lng = typeof rawLng === "number" ? rawLng : parseFloat(rawLng);
+      const lat = typeof rawLat === "number" ? rawLat : parseFloat(rawLat);
+
+      if (!Number.isFinite(lng) || !Number.isFinite(lat)) return;
+
       if (!bounds) {
         bounds = new mapboxgl.LngLatBounds([lng, lat], [lng, lat]);
       } else {
@@ -441,9 +445,6 @@ function highlightComparedTownsOnMap(comparison) {
       geomSource = town.boundary;
     } else if (town.geometry) {
       geomSource = town.geometry;
-    } else if (townName && townGeometries && townGeometries[townName]) {
-      // Fallback to static JSON geometry
-      geomSource = townGeometries[townName];
     }
 
     if (geomSource) {
@@ -480,9 +481,13 @@ function highlightComparedTownsOnMap(comparison) {
     }
 
     // 2) Always add a marker at the town centre if we have one (for visual focus + popup)
-    const centerLat = typeof town.center_lat === "number" ? town.center_lat : null;
-    const centerLng = typeof town.center_lng === "number" ? town.center_lng : null;
-    if (centerLat !== null && centerLng !== null) {
+    const centerLatRaw = town.center_lat;
+    const centerLngRaw = town.center_lng;
+
+    const centerLat = typeof centerLatRaw === "number" ? centerLatRaw : parseFloat(centerLatRaw);
+    const centerLng = typeof centerLngRaw === "number" ? centerLngRaw : parseFloat(centerLngRaw);
+
+    if (Number.isFinite(centerLat) && Number.isFinite(centerLng)) {
       const markerEl = document.createElement("div");
       markerEl.className = "compare-town-marker";
       markerEl.style.width = "14px";
@@ -1563,67 +1568,6 @@ async function bootstrap() {
       );
     }
 
-    // Load static town geometries for exact map highlighting (fallback if API does not send geometry)
-    try {
-      const rawTownGeoms = await getJSON("/static/data/town_geometries.json");
-
-      // Support both a pre-keyed { [townName]: geometry } map,
-      // and a raw URA-style FeatureCollection where each feature has
-      // the town name embedded in the Description HTML.
-      if (rawTownGeoms &&
-          !Array.isArray(rawTownGeoms) &&
-          rawTownGeoms.type === "FeatureCollection" &&
-          Array.isArray(rawTownGeoms.features)) {
-        const byName = {};
-
-        rawTownGeoms.features.forEach((f) => {
-          if (!f || !f.geometry) return;
-          const props = f.properties || {};
-
-          // Try a few common property names first
-          let name = props.town || props.TOWN || props.PLT_AREA_N || props.PLAN_AREA_N || null;
-
-          // If town name is embedded in Description HTML (URA export), extract PLN_AREA_N
-          // Example snippet: PLN_AREA_N</th> <td>BEDOK</td>
-          if (!name && typeof props.Description === "string") {
-            const match = props.Description.match(/PLN_AREA_N[\s\S]*?<td>(.*?)<\/td>/i);
-            if (match && match[1]) {
-              name = match[1].trim();
-            }
-          }
-
-          if (!name) return;
-
-          const key = name.toUpperCase();
-
-          if (!byName[key]) {
-            byName[key] = {
-              type: "FeatureCollection",
-              features: [],
-            };
-          }
-
-          byName[key].features.push({
-            type: "Feature",
-            geometry: f.geometry,
-            properties: {
-              ...(f.properties || {}),
-              town: name,
-            },
-          });
-        });
-
-        townGeometries = byName;
-      } else {
-        // Assume it's already a { [townName]: geometry } map
-        townGeometries = rawTownGeoms || {};
-      }
-
-      console.log("Loaded town geometries for towns:", Object.keys(townGeometries || {}));
-    } catch (geoErr) {
-      console.warn("Could not load /static/data/town_geometries.json; town highlighting will use centers only.", geoErr);
-      townGeometries = {};
-    }
     
     // Populate town selects
     const townSelects = ["#sel-town", "#trans-town", "#amenity-town", "#comp-town1", "#comp-town2", "#comp-town3", "#listing-town-filter"];
