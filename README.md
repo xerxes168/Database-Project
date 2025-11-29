@@ -107,41 +107,7 @@ Frontend (HTML/CSS/JS) → Flask API → MySQL (Aiven) + MongoDB Atlas
 pip install -r requirements.txt
 ```
 
-2️⃣ Configure environment variables
-
-Create a .env file:
-
-```env
-# Aiven → Service Overview → Connection info
-MYSQL_HOST=mysql-310ddec4-greggyyy.k.aivencloud.com
-MYSQL_PORT=27950
-MYSQL_USER=avnadmin
-MYSQL_PASSWORD=AVNS_mQhInc77FoEHAtcpQ1o
-MYSQL_DB=defaultdb
-
-# Path to the CA cert from Aiven
-MYSQL_SSL_CA=./ca.pem
-
-# Atlas MongoDB > MongoDB
-MONGO_URL=mongodb+srv://greggy_dbuser:JesusKing@homefinder-mongo.7d67tvq.mongodb.net/
-MONGO_DB=homefinder
-
-# Flask Configuration
-SECRET_KEY=92af2f20f6801794462986fa35bc90e7cdd35ff4a682bd632132f24783cb8c6f
-
-# Session Configuration
-SESSION_TYPE=filesystem
-PERMANENT_SESSION_LIFETIME=3600
-
-# Security Settings
-BCRYPT_LOG_ROUNDS=12
-
-# Application Settings
-FLASK_ENV=production
-FLASK_DEBUG=False
-```
-
-3️⃣ Launch the application
+2️⃣ Launch the application
 
 ```bash
 python app.py
