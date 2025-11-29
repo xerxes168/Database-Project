@@ -554,12 +554,33 @@ function highlightComparedTownsOnMap(comparison) {
   }
 
   // Finally, fit the map view to all collected bounds (polygons and/or centres)
-  if (bounds) {
-    hdbMap.fitBounds(bounds, {
-      padding: { top: 40, bottom: 40, left: 360, right: 40 },
-      maxZoom: 13,
-      duration: 800
-    });
+  if (bounds && typeof bounds.getSouthWest === "function" && typeof bounds.getNorthEast === "function") {
+    try {
+      const sw = bounds.getSouthWest();
+      const ne = bounds.getNorthEast();
+
+      const coords = [sw.lng, sw.lat, ne.lng, ne.lat].map((v) =>
+        typeof v === "number" ? v : parseFloat(v)
+      );
+
+      const allFinite = coords.every((v) => Number.isFinite(v));
+
+      if (allFinite) {
+        hdbMap.fitBounds(bounds, {
+          padding: { top: 40, bottom: 40, left: 360, right: 40 },
+          maxZoom: 13,
+          duration: 800
+        });
+      } else {
+        console.warn("Skipping fitBounds in highlightComparedTownsOnMap due to invalid bounds coordinates:", {
+          sw,
+          ne,
+          coords
+        });
+      }
+    } catch (fitErr) {
+      console.warn("Error while trying to fit bounds for compared towns; skipping fitBounds:", fitErr);
+    }
   }
 }
 
