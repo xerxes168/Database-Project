@@ -384,57 +384,120 @@ def query_town_comparison(towns, flat_type):
 
 # ========== AFFORDABILITY CALCULATION ==========
 
-def calculate_affordability_enhanced(income, expenses, loan_type="hdb", use_current_rates=True):
-    #Enhanced affordability calculation using actual database data
+def calculate_affordability_enhanced(
+    income,
+    expenses,
+    loan_type="hdb",
+    use_current_rates=True,
+    override_interest_rate=None,
+    override_tenure_years=None,
+    override_down_payment_pct=None,
+):
+    """
+    Enhanced affordability calculation using actual database data.
+
+    The caller can optionally override:
+      - interest rate (percent per year)
+      - loan tenure (years)
+      - down payment percentage of property value
+
+    If overrides are not supplied, we fall back to the latest rules/rates from MySQL.
+    """
     # Get current loan rules
     rules = get_current_loan_rules()
-    
-    # Get current mortgage rates
-    if use_current_rates:
-        rates = get_current_mortgage_rate()
-        interest_rate = rates['hdb_rate'] if loan_type == "hdb" else rates['bank_rate']
+
+    # Effective interest rate
+    if override_interest_rate is not None:
+        try:
+            interest_rate = float(override_interest_rate)
+        except (TypeError, ValueError):
+            # Fallback to DB rate if parsing fails
+            interest_rate = None
     else:
-        interest_rate = 2.6
-    
+        interest_rate = None
+
+    if interest_rate is None:
+        if use_current_rates:
+            rates = get_current_mortgage_rate()
+            interest_rate = rates["hdb_rate"] if loan_type == "hdb" else rates["bank_rate"]
+        else:
+            # basic default
+            interest_rate = 2.6
+
     # Get latest income data for context
     income_data = get_latest_household_income()
-    
+
     # Check eligibility
-    eligible_for_hdb_loan = income <= rules['income_ceiling']
-    
-    # Calculate based on MSR
-    max_msr_pct = rules['msr_pct'] / 100
+    eligible_for_hdb_loan = income <= rules["income_ceiling"]
+
+    # Calculate based on MSR (mortgage servicing ratio)
+    max_msr_pct = rules["msr_pct"] / 100.0
     max_monthly_payment = (income * max_msr_pct) - (expenses * 0.30)
-    
+
     # Loan calculation
-    tenure_years = rules['max_tenure_years']
-    monthly_rate = (interest_rate / 100) / 12
+    tenure_years = override_tenure_years or rules["max_tenure_years"]
+    try:
+        tenure_years = int(tenure_years)
+    except (TypeError, ValueError):
+        tenure_years = rules["max_tenure_years"]
+
+    monthly_rate = (interest_rate / 100.0) / 12.0
     num_payments = tenure_years * 12
-    
+
     if monthly_rate > 0:
-        max_loan = max_monthly_payment * ((1 - (1 + monthly_rate) ** -num_payments) / monthly_rate)
+        max_loan = max_monthly_payment * (
+            (1 - (1 + monthly_rate) ** -num_payments) / monthly_rate
+        )
     else:
         max_loan = max_monthly_payment * num_payments
-    
-    # Calculate max property value based on LTV
-    ltv_pct = rules['max_ltv_pct'] / 100
-    max_property_value = max_loan / ltv_pct
-    
-    # Calculate PSM
-    avg_flat_size_sqm = 90
-    max_psm = max_property_value / avg_flat_size_sqm if max_property_value > 0 else 0
-    
+
+    # Calculate max property value based on LTV / down payment
+    # If user provides a down-payment percentage, use that; otherwise fall back to rules.
+    if override_down_payment_pct is not None:
+        try:
+            dp_pct = float(override_down_payment_pct) / 100.0
+        except (TypeError, ValueError):
+            dp_pct = None
+    else:
+        dp_pct = None
+
+    rule_ltv_pct = rules["max_ltv_pct"] / 100.0
+
+    if dp_pct is not None:
+        # User-chosen down payment -> implied LTV
+        # Clamp to the rule-based maximum LTV so we do not exceed policy.
+        ltv_pct = 1.0 - dp_pct
+        if ltv_pct > rule_ltv_pct:
+            ltv_pct = rule_ltv_pct
+    else:
+        ltv_pct = rule_ltv_pct
+
+    # Guard against invalid LTV
+    if ltv_pct <= 0 or ltv_pct > 1:
+        ltv_pct = rule_ltv_pct
+
+    max_property_value = max_loan / ltv_pct if ltv_pct > 0 else 0.0
+
+    # Calculate PSM assuming a typical flat size
+    avg_flat_size_sqm = 90.0
+    max_psm = max_property_value / avg_flat_size_sqm if max_property_value > 0 else 0.0
+
     # Down payment
-    down_payment_required = max_property_value * (1 - ltv_pct)
-    
-    # Affordability
+    down_payment_required = max_property_value * (1.0 - ltv_pct)
+
+    # Affordability (simple rule-of-thumb threshold)
     affordable = max_property_value >= 300000
-    
+
     # Income comparison
     median_income_comparison = None
-    if income_data and income_data.get('resident_median'):
-        median_income_comparison = round((income / income_data['resident_median']) * 100, 1)
-    
+    if income_data and income_data.get("resident_median"):
+        try:
+            median_income_comparison = round(
+                (income / income_data["resident_median"]) * 100.0, 1
+            )
+        except ZeroDivisionError:
+            median_income_comparison = None
+
     return {
         "ok": True,
         "affordable": affordable,
@@ -443,13 +506,13 @@ def calculate_affordability_enhanced(income, expenses, loan_type="hdb", use_curr
         "max_monthly_payment": round(max_monthly_payment, 2),
         "max_psm": round(max_psm, 2),
         "down_payment_required": round(down_payment_required, 2),
-        "interest_rate": interest_rate,
+        "interest_rate": float(interest_rate),
         "loan_tenure_years": tenure_years,
-        "msr_used_pct": rules['msr_pct'],
-        "ltv_used_pct": rules['max_ltv_pct'],
+        "msr_used_pct": rules["msr_pct"],
+        "ltv_used_pct": rules["max_ltv_pct"],
         "eligible_for_hdb_loan": eligible_for_hdb_loan,
-        "income_ceiling": rules['income_ceiling'],
-        "median_income_comparison": median_income_comparison
+        "income_ceiling": rules["income_ceiling"],
+        "median_income_comparison": median_income_comparison,
     }
 
 # ========== MARKET STATISTICS ==========

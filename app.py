@@ -489,21 +489,43 @@ def api_affordability():
     payload = request.get_json() or {}
     
     try:
-        income = float(payload.get("income", 0))
-        expenses = float(payload.get("expenses", 0))
+        # Required numeric inputs
+        try:
+            income = float(payload.get("income", 0))
+        except (TypeError, ValueError):
+            income = 0.0
+        
+        try:
+            expenses = float(payload.get("expenses", 0))
+        except (TypeError, ValueError):
+            expenses = 0.0
+        
         loan_type = payload.get("loan_type", "hdb")
         
+        # Optional overrides from the frontend calculator
+        interest = payload.get("interest")
+        tenure_years = payload.get("tenure_years") or payload.get("tenure")
+        down_payment_pct = payload.get("down_payment_pct")
+        
+        # Call enhanced affordability with overrides if provided
         result = calculate_affordability_enhanced(
             income=income,
             expenses=expenses,
             loan_type=loan_type,
-            use_current_rates=True
+            # If the user supplied an interest rate, do not force current DB rates
+            use_current_rates=False if interest is not None else True,
+            override_interest_rate=interest,
+            override_tenure_years=tenure_years,
+            override_down_payment_pct=down_payment_pct,
         )
         
         # Log activity (user is guaranteed to be authenticated)
         log_user_activity(current_user.id, 'affordability_calc', {
             "income": income,
             "expenses": expenses,
+            "interest": interest,
+            "tenure_years": tenure_years,
+            "down_payment_pct": down_payment_pct,
             "affordable": result.get("affordable")
         })
         
